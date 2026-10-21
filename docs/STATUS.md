@@ -86,25 +86,59 @@ external helper (an Orca device tab, a keybind) would use later.
     PNG against the window size, and `--attach` captures a running instance
     instead of killing it.
 
+## Second pass — the print finished, then nine more fixes
+
+1. **Z-offset saved to config.** `Z_OFFSET_APPLY_PROBE` staged it and
+    `SAVE_CONFIG` committed it while idle: `[cartographer scan_model default]`
+    now carries `z_offset = -0.2` (the +0.200 babystep, inverted by the probe
+    model's convention). Klipper restarted clean and the offset reads 0.000.
+2. **The Z-OFFSET readout shows 0.000**, not 0.0 — three decimals, readout
+    widened from 96 to 108 px so the longer number cannot touch the ±0.005
+    buttons.
+3. **The file list now reads COMPLETED.** Two causes: the state was read
+    through `data`, a plain object mutated in place so no binding ever
+    re-evaluated, and history was only fetched when a view opened, so a job that
+    finished while the shell was up never entered the list. History is refetched
+    when Klipper reports the job ended.
+4. **The STATUS card shows the printing file**, right-aligned beside the
+    printer name, elided from the middle, only while a job is running.
+5. **The MACHINE card no longer says "Preparing to Print..."** — that was a
+    stale `M117` Klipper keeps in `display_status` forever. It shows only while
+    a job is active, and the card's height is computed from its row count
+    instead of the hardcoded 196 that clipped the last row.
+6. **Chart rules land on round degrees** (10/20/30/40/50/60): the scale snaps
+    to a 1/2/5×10ⁿ step instead of slicing the raw range into quarters.
+7. **INVALID update rows explain themselves**: "invalid: cannot reach
+    github.com" from Moonraker's `git_messages`, not `?`.
+8. **The GCode Viewer stopped eating the CPU.** With a file loaded a repaint
+    cost ~250 ms because every one of 113 000 segments allocated two arrays and
+    called three functions through the projection, and a poll repainted twice a
+    second whether or not anything moved. The projection is inlined (68 ms per
+    paint) and a poll only repaints when the scrub position changed: 5 paints to
+    load a file, then none until you touch the camera.
+9. **The window floats.** A windowrule in `~/.config/hypr/modules/windowrules.lua`
+    matches `class:^(org.quickshell)$` — matching on the title does not work,
+    Quickshell sets the title after the window is mapped — and sizes it
+    1900×1020. Every other app tiles as before.
+
 ## Still wrong, in priority order
 
-1. **klipshell launches tiled** if the target workspace already has a window —
-   Hyprland tiles a 1900-wide shell into half the screen and the layout is
-   unusable at 948 px. It needs a window rule (`float`, `size`) for
-   `class:^(org.quickshell)$,title:^(klipshell.*)`. Not added: that is a change
-   to `~/.config/hypr`, not to this repo.
-2. **Layer count and object exclusion are unavailable for this file.** Klipper
+1. **The dashboard's columns are taller than the window** (right column:
+   400 + 448 + 199 + gaps = 1071 px for ~950 available), so the MACHINE card is
+   sliced by the fold. The page scrolls and the console card already absorbs
+   slack, but nothing pulls the taller column back to fit.
+2. **A poll costs ~0.9 s of CPU.** The shell sits at 42-45% CPU while idle and
+   at 3% with the poll timer stopped, on a window that is not even visible. The
+   cause is the transport: every request is a `bash -c curl` process, ~10 per
+   poll, so the spinner is process spawning, not parsing — a probe spawning
+   `true` instead of `curl` still burned 39%. The fix is `XMLHttpRequest` (a QML
+   JS builtin) inside `MoonrakerService`, the transport-agnostic swap the
+   architecture was written for.
+3. **Layer count and object exclusion are unavailable for this file.** Klipper
    reports `current_layer: null` and an empty `exclude_object.objects` because
-   the slicer emitted no object labels. Not a shell bug — Orca needs
-   "Label objects" on — but the shell should say "no layer data in this file"
-   rather than `0/0`.
-3. **The window is 38 px taller than the design target** (asks 1900×1060, this
-   seat grants 1900×1022 with the bar). Pages are Flickables so nothing is
-   unreachable; the last row just needs a scroll the design assumed away.
-4. **Chart ticks land on odd values** (4°/62°/119°/177°/234°) because ticks are
-   derived from the data range instead of a fixed 5°/10° grid.
-5. **INVALID update rows show `?`** instead of the reason Moonraker returns.
-6. **26 qmllint warnings**, all the same block-scoped `var` style issue. No
+   the slicer emitted no object labels — Orca needs "Label objects" on. The IPC
+   `status` line now prints `layer=-` instead of `0/0`.
+4. **26 qmllint warnings**, all the same block-scoped `var` style issue. No
    behavioural effect.
 
 ## Unverified
@@ -125,14 +159,16 @@ them and treat this file as the list.
 
 ## What to do next
 
-1. A window rule so the shell is always floating and correctly sized on launch
-   (item 1 above) — one small edit to `~/.config/hypr`.
-2. Finish the untested actions in a second pass, ideally on a short sacrificial
-   file: cancel, exclude (with a labelled file), jog, then the Z-offset save path
-   on its own.
-3. Then Mainsail parity: the job queue (`server.job_queue.*` appears nowhere in
+1. Decide the dashboard column fit (item 1 above): trim the flexible cards, or
+   make the scroll bar obvious.
+2. Replace the curl-per-request transport with `XMLHttpRequest` (item 2) — the
+   single biggest performance win available, ~45% CPU down to single digits,
+   and it touches `MoonrakerService.qml` only.
+3. Finish the untested actions on a short sacrificial file: cancel, exclude
+   (with a labelled file), jog.
+4. Then Mainsail parity: the job queue (`server.job_queue.*` appears nowhere in
    the codebase), pause-at-layer, reprint, power devices.
-4. The web front end after that, once this list is empty.
+5. The web front end after that, once this list is empty.
 
 ## How to check it yourself
 

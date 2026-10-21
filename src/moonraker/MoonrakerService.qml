@@ -306,6 +306,7 @@ QtObject {
             var status = result.status
             root._missCount[cfg.name] = 0
             var state = root.printerData[cfg.name] || {}
+            var prevState = state.printState ?? ""
             state.name = cfg.name
             state.connected = true
             state.extruderTemp = status.extruder?.temperature ?? 0
@@ -313,6 +314,12 @@ QtObject {
             state.bedTemp = status.heater_bed?.temperature ?? 0
             state.bedTarget = status.heater_bed?.target ?? 0
             state.printState = status.print_stats?.state ?? "standby"
+            // A finished job only appears in history after the fact, so the file
+            // list kept reading NOT PRINTED until the next full refresh.
+            if (prevState !== "" && prevState !== state.printState
+                    && (state.printState === "complete" || state.printState === "cancelled"
+                        || state.printState === "error"))
+                root.fetchHistory()
             state.printMessage = status.print_stats?.message ?? ""
             state.printProgress = status.virtual_sdcard?.progress ?? 0
             state.printFilename = status.print_stats?.filename ?? ""

@@ -840,7 +840,8 @@ FloatingWindow {
                 + " state=" + (p.printState || "unknown")
                 + " file=" + (p.printFilename || "-")
                 + " progress=" + pct + "%"
-                + " layer=" + (p.layerCurrent || 0) + "/" + (p.layerTotal || 0)
+                + " layer=" + (Number(p.layerTotal ?? 0) > 0
+                    ? ((p.layerCurrent || 0) + "/" + p.layerTotal) : "-")
                 + " extruder=" + Math.round(Number(p.extruderTemp ?? 0)) + "/" + Math.round(Number(p.extruderTarget ?? 0))
                 + " bed=" + Math.round(Number(p.bedTemp ?? 0)) + "/" + Math.round(Number(p.bedTarget ?? 0))
                 + " z=" + Number(p.toolheadZ ?? 0).toFixed(2)
@@ -897,6 +898,9 @@ FloatingWindow {
         function refresh(): void { win.refreshView(win.activeView) }
 
         function loadCurrent(): void { gcodeViewerView.loadCurrent() }
-        function viewerFile(): string { return gcodeViewerView.printFile || "-" }
+        function loadFile(p: string): void { gcodeViewerView.loadServer(p) }
+        function viewerFile(): string { return gcodeViewerView.fileName || "-" }
+        function viewerPaints(): string { return String(gcodeViewerView.paintCount) }
+        function viewerPaintMs(): string { return String(gcodeViewerView.paintMs) }
     }
 }

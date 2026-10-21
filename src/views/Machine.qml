@@ -397,9 +397,25 @@ Item {
     // new); the rest show just their version.
     function _updateLine(key) {
         var item = root.machine?.update?.version_info?.[key] || {}
+        if (item.is_valid === false) return "invalid: " + root._updateReason(item)
         var v = String(item.version || "?")
         if (root._needsUpdate(item)) return Icons.refresh + " " + v + " > " + String(item.remote_version)
         return v + (item.dirty ? " (dirty)" : "")
+    }
+    // Moonraker reports `is_valid: false` with version "?" and the actual cause
+    // in git_messages/warnings (typically an unreachable remote).
+    function _updateReason(item) {
+        var msgs = item.git_messages || []
+        var warns = item.warnings || []
+        var msg = String(msgs.length > 0 ? msgs[0] : (warns.length > 0 ? warns[0] : ""))
+        if (msg === "") return "not updateable"
+        var m = msg.match(/unable to access '([^']+)'/)
+        if (m) {
+            var host = String(m[1]).replace(/^[a-z]+:\/\//, "").split("/")[0]
+            return "cannot reach " + host
+        }
+        m = msg.match(/^fatal: (.+)$/)
+        return m ? m[1] : msg
     }
     function _updateColor(key) {
         var item = root.machine?.update?.version_info?.[key] || {}

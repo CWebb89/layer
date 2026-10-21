@@ -46,8 +46,21 @@ Item {
         list.sort(function(a, b) { return (Number(b.modified) || 0) - (Number(a.modified) || 0) })
         return list.slice(0, 5)
     }
+    // Read through `historyJobs` rather than MoonrakerService's `data` object:
+    // that one is mutated in place, so a binding on it never re-evaluates and
+    // every finished file kept reading NOT PRINTED.
     function fileState(name) {
-        return root.moonraker.fileStateOf(name)
+        var live = root.ps
+        if (live && live.printFilename === name && root.jobActive) return String(live.printState)
+        var jobs = root.historyJobs
+        for (var i = 0; i < jobs.length; i++)
+            if (jobs[i].filename === name) return String(jobs[i].status || "")
+        return ""
+    }
+    readonly property string jobName: {
+        var f = String(root.ps?.printFilename ?? "")
+        var i = f.lastIndexOf("/")
+        return i < 0 ? f : f.slice(i + 1)
     }
     function stateLabel(s) {
         if (!s) return "NOT PRINTED"
@@ -244,8 +257,18 @@ Item {
         ? root._demoFill
         : (!root.on || (root.ps?.printState !== "printing" && root.ps?.printState !== "paused")
             ? 0 : Math.max(0, Math.min(1, Number(root.ps?.printProgress || 0))))
+    // The hardcoded 196 clipped the fourth limit row. Message row only exists
+    // while a job is running, so it changes the height too.
     function _machineHeight() {
-        return 196
+        var rows = root.limits.length
+        var msg = root.jobActive && root.machineMessage() !== "" ? 24 : 0
+        return 40 + (msg > 0 ? msg + Metrics.md : 0) + 1 + Metrics.md
+            + rows * 26 + (rows - 1) * Metrics.md + Metrics.panelPadding
+    }
+    function machineMessage() {
+        var d = String(root.ps?.displayMessage ?? "")
+        var m = String(root.ps?.printMessage ?? "")
+        return d !== "" ? d : m
     }
     function _miscHeight() {
         var n = root.on ? (root.ps?.fans ?? []).length : 0
@@ -515,33 +538,56 @@ Item {
                         anchors.topMargin: 12
                         anchors.bottomMargin: 12
                         spacing: 8
-                        Row {
+                        Item {
+                            id: statusRow
                             width: parent.width
-                            spacing: Metrics.sm
+                            height: 28
                             Rectangle {
+                                id: statusDot
                                 width: 8
                                 height: 8
                                 radius: 4
+                                anchors.left: parent.left
                                 anchors.verticalCenter: parent.verticalCenter
                                 color: root.on ? Colors.accent : Colors.outlineVariant
                             }
                             Text {
-                                width: parent.width - 8 - Metrics.sm - (root.moonraker.demo ? 60 : 0)
+                                anchors.left: statusDot.right
+                                anchors.leftMargin: Metrics.sm
+                                anchors.right: statusRight.left
+                                anchors.rightMargin: Metrics.md
+                                anchors.verticalCenter: parent.verticalCenter
                                 text: root.moonraker.activePrinter
                                 font.family: Type.family
                                 font.pixelSize: Type.sizeHeading
                                 font.bold: true
                                 color: Colors.textPrimary
                                 elide: Text.ElideRight
-                                anchors.verticalCenter: parent.verticalCenter
                             }
-                            Chip {
-                                visible: root.moonraker.demo
-                                text: "DEMO"
-                                pill: true
-                                filled: true
-                                color: Colors.tempWarm
+                            Row {
+                                id: statusRight
+                                anchors.right: parent.right
                                 anchors.verticalCenter: parent.verticalCenter
+                                spacing: Metrics.sm
+                                Chip {
+                                    visible: root.moonraker.demo
+                                    text: "DEMO"
+                                    pill: true
+                                    filled: true
+                                    color: Colors.tempWarm
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                                Text {
+                                    visible: root.jobActive && root.jobName !== ""
+                                    width: Math.min(implicitWidth, statusRow.width * 0.5)
+                                    horizontalAlignment: Text.AlignRight
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: root.jobName
+                                    font.family: Type.family
+                                    font.pixelSize: Type.sizeSmall
+                                    color: Colors.textSecondary
+                                    elide: Text.ElideMiddle
+                                }
                             }
                         }
                         Row {
@@ -877,9 +923,9 @@ Item {
                         Button { text: "−0.01";  variant: "plain"; onPressed: root.moonraker.zAdjust(-0.01) }
                         Button { text: "−0.005"; variant: "plain"; onPressed: root.moonraker.zAdjust(-0.005) }
                         Text {
-                            width: 96
+                            width: 108
                             height: parent.height
-                            text: root.on ? Settings.lengthText(root.ps?.zOffset ?? 0, Settings.lengthUnit === "in" ? 4 : 1) : "—"
+                            text: root.on ? Settings.lengthText(root.ps?.zOffset ?? 0, Settings.lengthUnit === "in" ? 4 : 3) : "—"
                             font.family: Type.family
                             font.pixelSize: Type.sizeLarge
                             font.bold: true
@@ -1482,17 +1528,20 @@ Item {
                 anchors.topMargin: parent.bodyTop
                 spacing: Metrics.md
 
+                // Klipper keeps the last M117 on display_status after a job
+                // ends, so an idle machine read "Preparing to Print..." for as
+                // long as the shell was open.
                 Text {
-                    visible: (root.ps?.displayMessage ?? "") !== ""
-                        || (root.ps?.printMessage ?? "") !== ""
+                    visible: root.jobActive && root.machineMessage() !== ""
                     width: parent.width
-                    text: (root.ps?.displayMessage ?? "") !== ""
-                        ? root.ps.displayMessage : (root.ps?.printMessage ?? "")
+                    text: root.machineMessage()
                     font.family: Type.family
                     font.pixelSize: Type.sizeBody
                     font.bold: true
                     color: Colors.textPrimary
                     wrapMode: Text.Wrap
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
                 }
                 Rectangle { width: parent.width; height: 1; color: Colors.separator }
                 Repeater {

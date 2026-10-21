@@ -34,6 +34,15 @@ Item {
     }
 
     // min/max over every non-null value of every series, padded 12%.
+    // Scale corners snap to a 1/2/5×10ⁿ step so the rules land on round values.
+    // Deriving ticks from the raw data range gave 4°/62°/119°/177°/234°.
+    function niceStep(span, target) {
+        var raw = span / Math.max(1, target)
+        var mag = Math.pow(10, Math.floor(Math.log(raw) / Math.LN10))
+        var norm = raw / mag
+        return (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag
+    }
+
     readonly property var yScale: {
         var lo, hi
         for (var i = 0; i < root.series.length; i++) {
@@ -53,7 +62,12 @@ Item {
         if (pad <= 0) pad = 1
         var half = Math.max((hi - lo) / 2 + pad, 20)
         var mid = (hi + lo) / 2
-        return { min: mid - half, max: mid + half }
+        var step = root.niceStep(half * 2, 4)
+        return {
+            min: Math.floor((mid - half) / step) * step,
+            max: Math.ceil((mid + half) / step) * step,
+            step: step
+        }
     }
 
     function yOf(v) {
@@ -69,12 +83,15 @@ Item {
     readonly property var gridLines: {
         if (!root.yScale) return []
         var out = []
-        var steps = 4
+        var step = root.yScale.step || 1
         var lo = root.yScale.min
-        var hi = root.yScale.max
-        for (var i = 0; i <= steps; i++) {
-            var v = lo + (hi - lo) * i / steps
-            out.push({ v: v, y: root.padT + root.plot.h * (1 - i / steps), label: Math.round(v) + "°" })
+        var span = root.yScale.max - lo
+        var n = Math.max(1, Math.round(span / step))
+        // y is computed here rather than via yOf(): yOf reads yScale, and a
+        // binding that re-reads the property it depends on never settles.
+        for (var i = 0; i <= n; i++) {
+            var v = lo + i * step
+            out.push({ v: v, y: root.padT + root.plot.h * (1 - (v - lo) / span), label: Math.round(v) + "°" })
         }
         return out
     }

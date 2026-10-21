@@ -69,6 +69,8 @@ Item {
     property string pendingObject: ""
     property string status: ""
     property int revision: 0
+    property int paintCount: 0
+    property real paintMs: 0
 
     readonly property var live: root.moonraker.active ?? null
     readonly property string printFile: String(root.live?.printFilename ?? "")
@@ -293,6 +295,7 @@ Item {
             }
         }
         function onStateChanged() {
+            var scrubBefore = root.scrubLine
             if (root.moonraker.gcodeError !== "" && root.status !== root.moonraker.gcodeError)
                 root.status = root.moonraker.gcodeError
             if (root.tracking && root.hasJob) {
@@ -300,11 +303,10 @@ Item {
                     Math.round(Number(root.live?.printProgress ?? 0) * root.job.total)))
                 root.stopPlay()
             }
-            // A poll lands every few seconds and each repaint re-projects the
-            // whole toolpath, so painting mid-parse is O(n²) again — just at the
-            // poll rate instead of the frame rate. The parse's own completion
-            // paint is the one that matters; skip the rest while it runs.
-            if (!root.parsing) view.requestPaint()
+            // A poll lands every two seconds and each repaint re-projects the
+            // whole toolpath, so repainting on every poll cost a quarter second
+            // of CPU twice a second whether or not anything moved.
+            if (!root.parsing && root.scrubLine !== scrubBefore) view.requestPaint()
         }
     }
 
@@ -641,9 +643,25 @@ Item {
         ctx.beginPath()
         lastKey = -1
         var pen = false
+        // The projection is inlined and each endpoint is projected once: the
+        // previous shape (a _world() array, two _screen() arrays and a
+        // _strokeLine() call per segment) allocated five objects for every one
+        // of 113 000 segments, which is what made a loaded file cost ~250 ms
+        // per repaint.
+        var e0 = cam.eye[0], e1 = cam.eye[1], e2 = cam.eye[2]
+        var f0 = cam.fwd[0], f1 = cam.fwd[1], f2 = cam.fwd[2]
+        var r0 = cam.right[0], r1 = cam.right[1], r2 = cam.right[2]
+        var u0 = cam.up[0], u1 = cam.up[1], u2 = cam.up[2]
+        var foc = cam.focal
+        var hw = W / 2, hh = H / 2
+        var scrub = root.scrubLine
+        var px = 0, py = 0
+        var qx = 0, qy = 0
+        var ex0 = 0, ex1 = 0, ex2 = 0
+        var joined = false
         for (o = 0; o + S <= n; o += S) {
             var key = root.bucketOf(seg[o + Gp.S_KEY], seg[o + Gp.S_FEED]) * 2
-                + (seg[o + Gp.S_LINE] > root.scrubLine ? 1 : 0)
+                + (seg[o + Gp.S_LINE] > scrub ? 1 : 0)
             if (key !== lastKey) {
                 if (pen) ctx.stroke()
                 ctx.beginPath()
@@ -651,8 +669,28 @@ Item {
                 ctx.globalAlpha = (key % 2) === 1 ? ghost : solid
                 lastKey = key
                 pen = false
+                joined = false
             }
-            root._strokeLine(ctx, cam, W, H, seg[o], seg[o + 1], seg[o + 2], seg[o + 3], seg[o + 4], seg[o + 5])
+            if (!(joined && seg[o] === ex0 && seg[o + 1] === ex1 && seg[o + 2] === ex2)) {
+                var ax = seg[o] - e0
+                var ay = seg[o + 1] - e1
+                var az = seg[o + 2] - e2
+                var zc = Math.max(1, ax * f0 + ay * f1 + az * f2)
+                px = hw + foc * (ax * r0 + ay * r1 + az * r2) / zc
+                py = hh - foc * (ax * u0 + ay * u1 + az * u2) / zc
+                ctx.moveTo(px, py)
+            }
+            var bx = seg[o + 3] - e0
+            var by = seg[o + 4] - e1
+            var bz = seg[o + 5] - e2
+            var zc2 = Math.max(1, bx * f0 + by * f1 + bz * f2)
+            qx = hw + foc * (bx * r0 + by * r1 + bz * r2) / zc2
+            qy = hh - foc * (bx * u0 + by * u1 + bz * u2) / zc2
+            ctx.lineTo(qx, qy)
+            ex0 = seg[o + 3]
+            ex1 = seg[o + 4]
+            ex2 = seg[o + 5]
+            joined = true
             pen = true
         }
         if (pen) ctx.stroke()
@@ -890,10 +928,17 @@ Item {
                     Canvas {
                         id: view
                         anchors.fill: parent
+                        // Painting a five-figure segment count on the GUI thread
+                        // held quickshell at ~70% CPU with a file loaded; the
+                        // image target lets the paint run on its own thread.
+                        renderTarget: Canvas.Image
+                        renderStrategy: Canvas.Immediate
                         onWidthChanged: requestPaint()
                         onHeightChanged: requestPaint()
 
                         onPaint: {
+                            root.paintCount = root.paintCount + 1
+                            var t0 = Date.now()
                             var ctx = view.getContext("2d")
                             ctx.reset()
                             var W = view.width
@@ -907,6 +952,7 @@ Item {
                             if (root.showObjects && root.objectBoxes().length > 0) root.paintObjects(ctx, cam, W, H)
                             root.paintScrubMarker(ctx, cam, W, H)
                             root.paintCursor(ctx, cam, W, H)
+                            root.paintMs = Date.now() - t0
                         }
                     }
 
