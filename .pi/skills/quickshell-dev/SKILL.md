@@ -58,33 +58,34 @@ while one is still starting. A second instance is a defect. `-n` is a backstop
 for a missed check, never a licence to skip it, and it only catches launches
 that pass the same resolved config path.
 
-**Quick regression capture** (single shot, auto-closes):
+**Use the harness — it is the whole launch step:**
 
 ```bash
-shot app /tmp/klipshell-ui.png -- quickshell -n -p /home/cwebb/dev/klipshell
+./tools/shot-view.sh <view> <out.png> [--keep] [--wait N] [--settle S]
 ```
 
-Replace the path with `Quickshell.shellDir`-style absolute path when the repo
-moves; a relative `-p .` is only safe when cwd is the project root.
+Views: `dash console files hist heightmap gcodeview machine layermind`. It closes any
+instance for the repo, focuses an unused workspace, launches with `KLIPSHELL_VIEW=<view>`,
+waits until a klipshell window is actually on that workspace, refuses to continue if two
+windows are there or if the window does not fit the seat, settles (`--settle`, default
+3.5 s, enough for the first polls and demo entry), captures with `shot onws`, kills the
+instance and restores the caller's workspace. `--keep` leaves it running for driving.
 
-**Interactive session** (keep it alive to drive and re-capture):
+**Views are chosen with `KLIPSHELL_VIEW`, not synthetic input.** `MainWindow.activeView`
+reads that env var at startup (unknown value → dashboard). Never temp-edit the file to
+capture a view: a save reloads the live instance mid-capture, which is how a
+`TypeError … 'length' of undefined` got into a log during a half-applied edit.
 
-```bash
-shot focus-empty                      # prints + focuses the next unused ws id, e.g. 9
-hyprctl dispatch 'hl.dsp.exec_cmd("/usr/bin/quickshell -n -p /home/cwebb/dev/klipshell")'
-sleep 1
-quickshell list -p /home/cwebb/dev/klipshell   # confirm exactly one instance
-shot onws 9 /tmp/klipshell-ui.png              # capture just that workspace
-```
-
-Record the ws id; you'll re-capture it after each edit round.
+**The failure this replaced:** `exec_cmd` launches on whatever workspace is focused, so
+without a preceding `shot focus-empty` the window lands on the caller's workspace and
+`shot onws <id>` either captures an empty workspace or the user's browser. Re-check the
+client's workspace with `hyprctl clients -j` instead of trusting the launch.
 
 ### 2. Drive
 
-- View switching is keyboard-driven (shell.qml Keys handling). There is no
-  wtype/ydotool on this machine — drive by scripting what the shell responds to
-  (state files, config, hyprctl) or by asking the user to press keys, not by
-  synthetic input.
+- View switching is keyboard-driven in normal use. For captures, set
+  `KLIPSHELL_VIEW=<id>` at launch (`tools/shot-view.sh` does it) — there is no
+  wtype/ydotool on this machine, so never try to press the shell's keys.
 - Popups/panels are layer-surface popups: `shot popup <out.png>` after asking
   the user to open the target (popup capture needs the popup already on screen).
 

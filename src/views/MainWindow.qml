@@ -22,7 +22,6 @@ FloatingWindow {
 
     readonly property int sidebarWidth: 166
 
-    property string activeView: "dash"
     property bool printerMenuOpen: false
     property bool settingsOpen: false
     property bool layoutOpen: false
@@ -37,6 +36,16 @@ FloatingWindow {
         { id: "machine", label: "MACHINE", icon: Icons.machine },
         { id: "layermind", label: "LAYERMIND", icon: Icons.layermind }
     ]
+
+    // Capture seam: KLIPSHELL_VIEW=<id> opens straight on that view, so a
+    // screenshot session never edits this file (a save reloads the live
+    // instance mid-capture). Any other value, or none, starts on the dashboard.
+    property string activeView: {
+        var v = String(Quickshell.env("KLIPSHELL_VIEW") || "")
+        for (var i = 0; i < win.ordered.length; i++)
+            if (win.ordered[i].id === v) return v
+        return "dash"
+    }
 
     function refreshView(id) {
         if (id === "dash") dashView.refresh()

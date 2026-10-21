@@ -36,7 +36,7 @@ check() {
 }
 
 check "qmllint (errors)"   bash -O globstar -c 'qmllint --silent shell.qml src/**/*.qml'
-check "shell syntax"       bash -c 'bash -n install.sh && bash -n launch.sh'
+check "shell syntax"       bash -c 'bash -n install.sh && bash -n launch.sh && bash -n tools/shot-view.sh'
 check "gcode parser"       node src/gcode/test-parse.js
 check "settings logic"     node src/config/test-settings.js
 check "icon glyphs"        python3 tools/check-icons.py
