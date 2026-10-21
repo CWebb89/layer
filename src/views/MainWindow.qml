@@ -351,6 +351,37 @@ FloatingWindow {
             }
         }
 
+        // ── Demo-data badge (visible from every view) ──
+        // The seed reproduces the real host, MCU types and config filenames, so
+        // demo mode is indistinguishable from a live printer without this.
+        Rectangle {
+            id: demoBadge
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.leftMargin: Metrics.spacing
+            anchors.rightMargin: Metrics.spacing
+            anchors.bottom: printerChip.top
+            anchors.bottomMargin: Metrics.sm
+            height: MoonrakerService.demo ? 44 : 0
+            visible: height > 0
+            radius: Metrics.radiusSmall
+            color: Colors.surfaceContainerHigh
+            border.width: Metrics.borderWidth
+            border.color: Colors.error
+            Text {
+                anchors.centerIn: parent
+                width: parent.width - 12
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.Wrap
+                text: "DEMO DATA"
+                font.family: Type.family
+                font.pixelSize: Type.sizeCaption
+                font.bold: true
+                font.letterSpacing: 1.0
+                color: Colors.error
+            }
+        }
+
         // ── Printer selector (moved from the top-right header) ──
         Item {
             id: printerChip
@@ -575,14 +606,18 @@ FloatingWindow {
 
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: Icons.offline
+                text: MoonrakerService.authFailed ? Icons.error : Icons.offline
                 font.family: Type.family
                 font.pixelSize: Type.sizeXLarge + 6
-                color: Colors.textTertiary
+                color: MoonrakerService.authFailed ? Colors.error : Colors.textTertiary
             }
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: MoonrakerService.printers.length > 0 ? "NO PRINTER CONNECTED" : "NO PRINTERS CONFIGURED"
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.Wrap
+                text: MoonrakerService.authFailed ? "API KEY REJECTED"
+                    : (MoonrakerService.printers.length > 0 ? "NO PRINTER CONNECTED" : "NO PRINTERS CONFIGURED")
                 font.family: Type.family
                 font.pixelSize: Type.sizeHeading
                 font.bold: true
@@ -591,9 +626,14 @@ FloatingWindow {
             }
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: MoonrakerService.printers.length > 0
-                    ? "Pick a printer on the left, or reconnect. Connection is retried automatically every 2s."
-                    : "Add printers to src/config/printers.json."
+                width: parent.width
+                text: MoonrakerService.authFailed
+                    ? "Moonraker is answering, but it refused the key stored for "
+                      + (MoonrakerService.authFailedPrinter || "this printer")
+                      + ". Fix it in Settings → PRINTERS; a corrected key is picked up on the next poll."
+                    : (MoonrakerService.printers.length > 0
+                        ? "Pick a printer on the left, or reconnect. Connection is retried automatically every 2s."
+                        : "Add printers to src/config/printers.json.")
                 font.family: Type.family
                 font.pixelSize: Type.sizeSmall
                 color: Colors.surfaceVariantText
@@ -603,10 +643,13 @@ FloatingWindow {
             Button {
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: 200; height: Metrics.controlHeight
-                text: "RECONNECT"
-                icon: Icons.refresh
+                text: MoonrakerService.authFailed ? "OPEN SETTINGS" : "RECONNECT"
+                icon: MoonrakerService.authFailed ? Icons.settings : Icons.refresh
                 variant: "primary"
-                onPressed: MoonrakerService.reconnect()
+                onPressed: {
+                    if (MoonrakerService.authFailed) win.settingsOpen = true
+                    else MoonrakerService.reconnect()
+                }
             }
         }
     }

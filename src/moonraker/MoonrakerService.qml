@@ -105,6 +105,12 @@ QtObject {
     // normalized data so the UI stays populated (dev/offsite). Short-circuits
     // the transport below; `demo` flips on after repeated poll misses.
     property bool demo: false
+    // A rejected key (HTTP 401/403) is a configuration fault, not an offline
+    // printer, so it gets its own state and never seeds demo data: the seed is
+    // realistic enough (host, MCU types, config filenames) to pass for a live
+    // printer at a glance. Cleared by the first 2xx answer.
+    property bool authFailed: false
+    property string authFailedPrinter: ""
     property var _demoLines: []
     property var _demoTempSeries: null
     property int _demoProbe: 0
@@ -226,6 +232,8 @@ QtObject {
             root.activePrinter = root.printers[0].name
         root._missCount = {}
         root.demo = false
+        root.authFailed = false
+        root.authFailedPrinter = ""
         root._zBaseSet = false
         for (var k in root.data) delete root.data[k]
         root.refresh()
@@ -377,9 +385,30 @@ QtObject {
         } catch (e) {}
     }
 
+    function _noteHttp(code, cfg) {
+        if (!cfg) return
+        if (code === 401 || code === 403) {
+            var first = !root.authFailed
+            root.authFailed = true
+            root.authFailedPrinter = cfg.name
+            root.demo = false
+            root.loading = false
+            if (first) root.note("error", "API KEY REJECTED",
+                cfg.name + " — Moonraker answered HTTP " + code + ". The key stored for this printer is wrong; demo data is not shown while a key is rejected.")
+            return
+        }
+        if (code >= 200 && code < 400 && root.authFailed) {
+            var who = root.authFailedPrinter
+            root.authFailed = false
+            root.authFailedPrinter = ""
+            root.note("info", "API KEY ACCEPTED", who + " — Moonraker is answering again.")
+        }
+    }
+
     function _miss() {
         var cfg = root._activeCfg()
         if (!cfg) return
+        if (root.authFailed) return
         var misses = (root._missCount[cfg.name] || 0) + 1
         root._missCount[cfg.name] = misses
         if (misses >= 2) {
@@ -671,11 +700,13 @@ QtObject {
     function _probeDemo(cfg) {
         var safeUrl = root._url(cfg, "/printer/info").replace(/'/g, "'\\''")
         root._fetch(["bash", "-c",
-            "curl -s --max-time 5 '" + safeUrl + "' 2>/dev/null || echo '{}'"], cfg,
+            "curl -s --max-time 5 -w '\\n" + root._statusTag + "%{http_code}' '" + safeUrl + "' 2>/dev/null"], cfg,
             function(pcfg, raw) {
                 try {
                     if (JSON.parse(raw.trim()).result) {
                         root.demo = false
+                        root.authFailed = false
+                        root.authFailedPrinter = ""
                         root._zBaseSet = false
                         root.refresh()
                         root.note("info", "PRINTER BACK ONLINE", pcfg.name)
@@ -685,6 +716,10 @@ QtObject {
     }
 
     // ── Generic transport ──────────────────────────────────────────────
+    // curl appends this marker and the HTTP status after the body, so the
+    // transport can tell a rejected key (401/403) from a dead host (000).
+    readonly property string _statusTag: "QSSTATUS:"
+
     function _url(cfg, path) {
         return "http://" + cfg.host + ":" + cfg.port + path
     }
@@ -731,7 +766,7 @@ QtObject {
         var safeUrl = root._url(c, path).replace(/'/g, "'\\''")
         root._fetch(["bash", "-c",
             "curl -s --max-time 5 " + root._authHeader(c)
-            + "'" + safeUrl + "' 2>/dev/null || echo '{}'"], c, handler)
+            + "-w '\\n" + root._statusTag + "%{http_code}' '" + safeUrl + "' 2>/dev/null"], c, handler)
     }
 
     function _post(path, body, handler, cfg) {
@@ -743,7 +778,8 @@ QtObject {
         root._fetch(["bash", "-c",
             "curl -s --max-time 5 " + root._authHeader(c)
             + "-X POST -H 'Content-Type: application/json' "
-            + "-d '" + payload + "' '" + safeUrl + "' 2>/dev/null || echo '{}'"], c,
+            + "-w '\\n" + root._statusTag + "%{http_code}' "
+            + "-d '" + payload + "' '" + safeUrl + "' 2>/dev/null"], c,
             handler || function(cfg, raw) {})
     }
 
@@ -1576,7 +1612,15 @@ QtObject {
     }
 
     function _dispatch(handler, printerCfg, raw) {
-        if (handler) handler(printerCfg, raw)
+        var t = String(raw === undefined || raw === null ? "" : raw)
+        var tag = t.lastIndexOf("\n" + root._statusTag)
+        if (tag >= 0) {
+            var code = Number(t.slice(tag + 1 + root._statusTag.length)) || 0
+            t = t.slice(0, tag)
+            if (code === 0 && !t.trim()) t = "{}"
+            root._noteHttp(code, printerCfg)
+        }
+        if (handler) handler(printerCfg, t)
     }
 
     property var p0: Process {
