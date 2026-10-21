@@ -72,13 +72,13 @@ toolhead sitting at Y minimum.
 
 ## Still wrong, in priority order
 
-1. **The bottom of the screen is cut off.** klipshell asks for a 1900×1060
-   window; this seat gives it 1900×1022 because the Hyprland bar and gaps take
-   the rest. Views that lay out a fixed stack of cards (Machine, the Console
-   input row, the bottom of the Dashboard) overflow by roughly 38 px and the
-   last row is sliced. This is why the Console's send field looks like a thin
-   strip with no button. It needs a decision: shrink the design height to what
-   the seat actually gives, or make dense views scroll. Not guessed at.
+1. **The window is 38 px shorter than the design target.** klipshell asks for
+   1900×1060; this seat grants 1900×1022 because the Hyprland bar and gaps take
+   the rest. Pages that lay out a fixed stack of cards (Machine, the bottom of
+   the Dashboard's left column) are Flickables, so nothing is unreachable — the
+   last row simply sits below the fold and needs a scroll the design assumed
+   would not be necessary. Either shrink the design height to what the seat
+   gives, or leave it and accept a small scroll. Cosmetic, not lost data.
 2. **Loading states lie.** The Machine card says "no components reported
    (printer unreachable or updater disabled)" while it is simply still waiting;
    INVALID update rows show `?` instead of why they are invalid.
@@ -113,18 +113,18 @@ remembered.
 
 ## What to do next
 
-1. **Decide the window height question** (item 1 above) — it is the only defect
-   that touches every view, and it is a one-line change plus a check of three
-   views.
-2. **Load a print and drive it**: start, pause, resume, exclude an object,
-   cancel — plus the Z-offset save path. That closes the entire "unverified"
-   list above in one session and is the last thing standing between klipshell
-   and a web front end.
-3. Then Mainsail parity items that are genuinely missing: the job queue
+1. **Do one live print pass.** Start a real job, pause, resume, exclude an
+   object, cancel; run the Z-offset babystep and the SAVE Z (ENDSTOP/PROBE) →
+   SAVE_CONFIG path; upload from Orca and watch it appear. That closes the whole
+   "unverified" list above and is the last gate before a web front end.
+2. Then Mainsail parity items that are genuinely missing: the job queue
    (`server.job_queue.*` never appears in the codebase), pause-at-layer,
    reprint, and printer power control if the Vorons use it.
-4. Job queue and power devices are self-contained views; the queue is
-   Mainsail's own priority-one feature and the natural next build.
+3. The job queue is the natural next build — self-contained view, Mainsail's own
+   priority-one feature, and the Files list already has the place to hook
+   "add to queue" into.
+4. The 38 px window-height question above is worth ten minutes whenever the
+   layout is next touched, not before.
 
 ## How to check it yourself
 
