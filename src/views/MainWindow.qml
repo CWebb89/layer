@@ -822,4 +822,78 @@ FloatingWindow {
             }
         }
     }
+
+    // Scriptable control surface: `quickshell ipc call klipshell <fn>`. Every
+    // entry here is the function the views call, so an action exercised over IPC
+    // is the same code path a click takes. It exists to drive the shell during
+    // live verification, and it is the seam a companion helper (the Orca device
+    // tab, a script, a keybind) can use without the UI.
+    IpcHandler {
+        target: "klipshell"
+
+        function status(): string {
+            var p = MoonrakerService.active
+            if (!p) return "printer=none"
+            var pct = Math.round(Number(p.printProgress ?? 0) * 100)
+            return "printer=" + MoonrakerService.activePrinter
+                + " connected=" + (p.connected === true)
+                + " state=" + (p.printState || "unknown")
+                + " file=" + (p.printFilename || "-")
+                + " progress=" + pct + "%"
+                + " layer=" + (p.layerCurrent || 0) + "/" + (p.layerTotal || 0)
+                + " extruder=" + Math.round(Number(p.extruderTemp ?? 0)) + "/" + Math.round(Number(p.extruderTarget ?? 0))
+                + " bed=" + Math.round(Number(p.bedTemp ?? 0)) + "/" + Math.round(Number(p.bedTarget ?? 0))
+                + " z=" + Number(p.toolheadZ ?? 0).toFixed(2)
+                + " zoffset=" + Number(p.zOffset ?? 0).toFixed(3)
+                + " pendingConfig=" + (p.configChanges ?? []).length
+                + " excluded=" + (p.excludeExcluded ?? []).length
+        }
+
+        function objects(): string {
+            var p = MoonrakerService.active
+            return (p?.excludeObjects ?? []).join(",")
+        }
+
+        function view(id: string): string {
+            win.switchView(id)
+            return win.activeView
+        }
+
+        function pause(): void { MoonrakerService.pausePrint() }
+        function resume(): void { MoonrakerService.resumePrint() }
+        function cancel(): void { MoonrakerService.cancelPrint() }
+        function estop(): void { MoonrakerService.emergencyStop() }
+
+        function start(path: string): void { MoonrakerService.startPrint(path) }
+        function gcode(script: string): void { MoonrakerService.sendGcode(script) }
+
+        function preheat(heater: string, target: string): void {
+            MoonrakerService.setHeaterTemp(heater, String(Number(target) || 0))
+        }
+        function speed(factor: string): void { MoonrakerService.setSpeedFactor(Number(factor) || 100) }
+        function flow(factor: string): void { MoonrakerService.setFlowFactor(Number(factor) || 100) }
+        function fan(pct: string): void { MoonrakerService.setFanPercent(Number(pct) || 0) }
+
+        function home(which: string): void {
+            if (which === "xy") MoonrakerService.moveHomeXY()
+            else if (which === "z") MoonrakerService.moveHomeZ()
+            else MoonrakerService.moveHomeAll()
+        }
+        function jog(axis: string, dist: string, speed: string): void {
+            MoonrakerService.jog(axis, Number(dist) || 0, Number(speed) || 40)
+        }
+        function motorsOff(): void { MoonrakerService.motorsOff() }
+        function qgl(): void { MoonrakerService.quadGantryLevel() }
+        function extrude(amount: string, speed: string): void {
+            MoonrakerService.extrude(Number(amount) || 0, Number(speed) || 25)
+        }
+
+        function zAdjust(delta: string): void { MoonrakerService.zAdjust(Number(delta) || 0) }
+        function saveZ(mode: string): void { MoonrakerService.zOffsetApply(mode) }
+        function clearZ(): void { MoonrakerService.clearZOffset() }
+        function saveConfig(): void { MoonrakerService.saveConfig() }
+        function exclude(name: string): void { MoonrakerService.excludeObject(name) }
+
+        function refresh(): void { win.refreshView(win.activeView) }
+    }
 }

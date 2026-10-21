@@ -321,7 +321,7 @@ QtObject {
             state.toolheadX = status.toolhead?.position?.[0] ?? 0
             state.toolheadY = status.toolhead?.position?.[1] ?? 0
             state.toolheadZ = status.toolhead?.position?.[2] ?? 0
-            state.fanPower = status.fan?.power ?? 0
+            state.fanPower = status.fan?.speed ?? 0
             state.speedFactor = status.gcode_move?.speed_factor ?? 1
             state.flowFactor = status.gcode_move?.extrude_factor ?? 1
             state.pressureAdvance = status.extruder?.pressure_advance ?? 0
