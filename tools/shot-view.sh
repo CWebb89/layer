@@ -68,17 +68,36 @@ if /usr/bin/quickshell list -p "$REPO" 2>/dev/null | grep -q 'Instance '; then
   sleep 2
 fi
 
-ws="$(shot focus-empty)"
-if ! printf '%s' "$ws" | grep -Eq '^[0-9]+$'; then
-  echo "shot focus-empty did not report a workspace id: '$ws'" >&2
+# Pick a workspace with nothing on it, and never the caller's if it holds a window:
+# `shot focus-empty` trusts Hyprland's workspace list, which still contains
+# workspaces that exist but are empty — that is fine — but it also returns the
+# caller's own workspace when nothing is on it, which is how a capture ended up
+# containing the caller's terminal. Choose from the client list, then verify.
+ws="$(clients | python3 -c '
+import sys, json
+taken = {c["workspace"]["id"] for c in json.load(sys.stdin)}
+i = 1
+while i in taken:
+    i += 1
+print(i)')"
+/usr/bin/hyprctl dispatch "hl.dsp.focus({workspace=\"$ws\"})" >/dev/null
+sleep 0.4
+occupied="$(clients | python3 -c '
+import sys, json
+ws = int(sys.argv[1])
+print(sum(1 for c in json.load(sys.stdin) if c["workspace"]["id"] == ws))' "$ws")"
+if [ "$occupied" != "0" ]; then
+  echo "workspace $ws is not empty ($occupied window(s)) — refusing to launch there" >&2
   exit 1
 fi
 echo "capture workspace: $ws (caller on $caller_ws)"
 
 /usr/bin/hyprctl dispatch "hl.dsp.exec_cmd(\"/usr/bin/env KLIPSHELL_VIEW=$VIEW /usr/bin/quickshell -n -p $REPO\")" >/dev/null
 
-monitor_w="$(/usr/bin/hyprctl monitors -j | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["width"])')"
-monitor_h="$(/usr/bin/hyprctl monitors -j | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["height"])')"
+read -r _mon_x _mon_y monitor_w monitor_h <<<"$(/usr/bin/hyprctl monitors -j | python3 -c '
+import sys, json
+m = [x for x in json.load(sys.stdin) if x["focused"]][0]
+print(m["x"], m["y"], m["width"], m["height"])')"
 
 win=""
 deadline=$(( $(date +%s) + WAIT ))
@@ -94,7 +113,8 @@ if len(found) > 1:
     print("MULTIPLE")
 elif found:
     c = found[0]
-    print("%dx%d" % (c["size"][0], c["size"][1]))
+    print("%s %d,%d %dx%d" % (c["address"], c["at"][0], c["at"][1],
+                              c["size"][0], c["size"][1]))
 ' "$ws")"
   [ -n "$win" ] && break
   sleep 0.5
@@ -109,20 +129,58 @@ case "$win" in
     exit 1 ;;
 esac
 
-# A window that does not fit the seat cannot be captured whole.
-ww="${win%x*}"; wh="${win#*x}"
+read -r w_addr w_at w_size <<<"$win"
+ww="${w_size%x*}"; wh="${w_size#*x}"
+wx="${w_at%,*}"; wy="${w_at#*,}"
 if [ "$ww" -gt "$monitor_w" ] || [ "$wh" -gt "$monitor_h" ]; then
-  echo "window $win exceeds the ${monitor_w}x${monitor_h} monitor — capture would clip it" >&2
+  echo "window ${ww}x${wh} exceeds the ${monitor_w}x${monitor_h} monitor — capture would clip it" >&2
+  exit 1
+fi
+
+# Capture the window, not the monitor: the shell is smaller than the seat, so a
+# full-output grab drags in the bar and the wallpaper and is not "the window".
+# grim refuses -o and -g together, which is why `shot onws` cannot crop — so
+# focus the window on the capture workspace and let `shot window` do the crop.
+/usr/bin/hyprctl dispatch "hl.dsp.focus({window=\"address:$w_addr\"})" >/dev/null
+active="$(/usr/bin/hyprctl activewindow -j | python3 -c 'import sys,json; print(json.load(sys.stdin).get("address", ""))')"
+if [ "$active" != "$w_addr" ]; then
+  echo "could not focus the klipshell window ($w_addr); active is '$active'" >&2
   exit 1
 fi
 
 sleep "$SETTLE"
-shot onws "$ws" "$OUT" || { echo "capture failed" >&2; exit 1; }
+
+# Focus is not sticky: verify the window is still the active one at capture time,
+# and re-take focus once if something else grabbed it. `shot window` captures
+# whatever is focused, so a stale focus silently yields a screenshot of the
+# caller's terminal instead of the shell.
+for attempt in 1 2; do
+  active="$(/usr/bin/hyprctl activewindow -j | python3 -c 'import sys,json; print(json.load(sys.stdin).get("address", ""))')"
+  [ "$active" = "$w_addr" ] && break
+  [ "$attempt" = 2 ] && { echo "lost focus to '$active' before capture" >&2; exit 1; }
+  /usr/bin/hyprctl dispatch "hl.dsp.focus({window=\"address:$w_addr\"})" >/dev/null
+  sleep 1
+done
+
+shot window "$OUT" || { echo "capture failed" >&2; exit 1; }
+
+# A capture that is not the window's size means something else was grabbed.
+read -r png_w png_h <<<"$(python3 - "$OUT" <<'PY'
+import struct, sys
+with open(sys.argv[1], 'rb') as f:
+    head = f.read(24)
+print(*struct.unpack('>II', head[16:24]))
+PY
+)"
+if [ "$png_w" != "$ww" ] || [ "$png_h" != "$wh" ]; then
+  echo "capture is ${png_w}x${png_h} but the window is ${ww}x${wh} — wrong window captured" >&2
+  exit 1
+fi
 
 if [ ! -s "$OUT" ]; then
   echo "capture produced no bytes: $OUT" >&2
   exit 1
 fi
 
-printf 'view %s · workspace %s · window %s · %s (%s bytes)\n' \
-  "$VIEW" "$ws" "$win" "$OUT" "$(stat -c %s "$OUT")"
+printf 'view %s · workspace %s · window %sx%s at %s,%s · %s (%s bytes)\n' \
+  "$VIEW" "$ws" "$png_w" "$png_h" "$wx" "$wy" "$OUT" "$(stat -c %s "$OUT")"

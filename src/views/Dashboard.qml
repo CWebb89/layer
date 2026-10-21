@@ -21,6 +21,12 @@ Item {
     property var openView: null
     readonly property var ps: root.moonraker.active
     readonly property bool on: ps?.connected === true
+    // PAUSE and CANCEL only mean something while a job is running; in STANDBY
+    // they were live buttons that did nothing when pressed.
+    readonly property bool jobActive: {
+        var s = String(ps?.printState ?? "")
+        return s === "printing" || s === "paused"
+    }
 
     // ── STATUS card data: printer limits + recent uploads ─────────────
     property var limits: [
@@ -1703,10 +1709,10 @@ Item {
         Button { text: root.ps?.printState === "paused" ? "RESUME" : "PAUSE"
                  icon: root.ps?.printState === "paused" ? Icons.play : Icons.pause
                  variant: "plain"; height: root.transportH; rounded: false; bold: true
-                 iconPixelSize: Type.iconStandalone; active: root.on
+                 iconPixelSize: Type.iconStandalone; active: root.on && root.jobActive
                  onPressed: root.ps?.printState === "paused" ? root.moonraker.resumePrint() : root.moonraker.pausePrint() }
         Button { text: "CANCEL"; icon: Icons.stop; variant: "plain"; height: root.transportH
-                 rounded: false; bold: true; iconPixelSize: Type.iconStandalone; active: root.on
+                 rounded: false; bold: true; iconPixelSize: Type.iconStandalone; active: root.on && root.jobActive
                  onPressed: root.askCancel() }
         Button { text: "E-STOP"; icon: Icons.power; variant: "danger"; solid: true; height: root.transportH
                  rounded: false; bold: true; iconPixelSize: Type.iconStandalone; active: root.on

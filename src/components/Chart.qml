@@ -62,6 +62,22 @@ Item {
     function xOf(i) {
         return root.padL + root.plot.w * (root.plot.n > 1 ? i / (root.plot.n - 1) : 0)
     }
+
+    // Four horizontal rules with their values. The chart used to draw the series
+    // and nothing else, so a flat standby line at 25°C sat in empty space with
+    // no scale to read it against.
+    readonly property var gridLines: {
+        if (!root.yScale) return []
+        var out = []
+        var steps = 4
+        var lo = root.yScale.min
+        var hi = root.yScale.max
+        for (var i = 0; i <= steps; i++) {
+            var v = lo + (hi - lo) * i / steps
+            out.push({ v: v, y: root.padT + root.plot.h * (1 - i / steps), label: Math.round(v) + "°" })
+        }
+        return out
+    }
     // readout rows while hovering: series + value (+ target) at hoverIndex.
     readonly property var readouts: {
         if (root.hoverIndex < 0) return []
@@ -136,6 +152,17 @@ Item {
             var ph = root.plot.h
             var lineJoin = "round"
             var lineCap = "round"
+
+            // y grid first, so every series sits on top of it
+            ctx.strokeStyle = Colors.alpha(Colors.surfaceVariantText, 0.14)
+            ctx.lineWidth = 1
+            var grid = root.gridLines
+            for (var g = 0; g < grid.length; g++) {
+                ctx.beginPath()
+                ctx.moveTo(px, grid[g].y)
+                ctx.lineTo(px + pw, grid[g].y)
+                ctx.stroke()
+            }
 
             // per series: smooth spark line (webb-shell stat style) + head dot
             for (var i = 0; i < root.series.length; i++) {
@@ -217,6 +244,20 @@ Item {
                     ctx.fill()
                 }
             }
+        }
+    }
+
+    // ── y axis values (Item overlays; this Canvas draws vectors only) ──
+    Repeater {
+        model: root.gridLines
+        delegate: Text {
+            required property var modelData
+            x: root.padL + 4
+            y: modelData.y + 1
+            text: modelData.label
+            font.family: Type.family
+            font.pixelSize: Type.sizeSmall - 1
+            color: Colors.alpha(Colors.surfaceVariantText, 0.55)
         }
     }
 

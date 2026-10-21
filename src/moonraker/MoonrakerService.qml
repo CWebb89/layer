@@ -286,6 +286,7 @@ QtObject {
         if (!root.data.machine?.sysinfo) root.fetchSysInfo()
         if (!root.data.machine?.update) root.fetchUpdateInfo()
         if (!root.data.bedmesh && root._bedMeshWanted) root.fetchBedMesh()
+        root._drainQueue()
     }
 
     function _activeCfg() {
@@ -731,7 +732,9 @@ QtObject {
         return c ? root._url(c, "") : ""
     }
 
-    // Never kill an in-flight curl: pick a free slot or drop the request.
+    // Never kill an in-flight curl: pick a free slot or queue the request.
+    property var _queue: []
+
     function _freeSlot() {
         for (var i = 0; i < 8; i++)
             if (!root._pick(i).running) return root._pick(i)
@@ -740,12 +743,33 @@ QtObject {
 
     function _fetch(command, cfg, handler) {
         var proc = root._freeSlot()
-        if (!proc) return
-        proc.command = command
+        if (!proc) {
+            // A dropped request used to vanish. Every view fetch is one-shot, so a
+            // burst while the poll held all 8 slots left G-CODE FILES reading "no
+            // gcode files on the printer", HISTORY "0 of 0 jobs", and the machine
+            // card "no components reported", until the view was reopened. Queue
+            // instead and drain whenever a slot frees.
+            if (root._queue.length < 40) root._queue.push({ command: command, cfg: cfg, handler: handler })
+            return
+        }
+        root._run(proc, command, cfg, handler)
+    }
+
+    function _run(proc, command, cfg, handler) {
         proc._handler = handler
         proc._printerCfg = cfg
+        proc.command = command
         proc.running = false
         proc.running = true
+    }
+
+    function _drainQueue() {
+        while (root._queue.length > 0) {
+            var proc = root._freeSlot()
+            if (!proc) return
+            var job = root._queue.shift()
+            root._run(proc, job.command, job.cfg, job.handler)
+        }
     }
 
     // Moonraker only asks for the key when it runs [authorization] and treats
@@ -1627,54 +1651,54 @@ QtObject {
         property var _printerCfg: null
         property var _handler: null
         command: []; running: false
-        stdout: StdioCollector { onStreamFinished: root._dispatch(root.p0._handler, root.p0._printerCfg, text) }
+        stdout: StdioCollector { onStreamFinished: { root._dispatch(root.p0._handler, root.p0._printerCfg, text); root._drainQueue() } }
     }
     property var p1: Process {
         property var _printerCfg: null
         property var _handler: null
         command: []; running: false
-        stdout: StdioCollector { onStreamFinished: root._dispatch(root.p1._handler, root.p1._printerCfg, text) }
+        stdout: StdioCollector { onStreamFinished: { root._dispatch(root.p1._handler, root.p1._printerCfg, text); root._drainQueue() } }
     }
     property var p2: Process {
         property var _printerCfg: null
         property var _handler: null
         command: []; running: false
-        stdout: StdioCollector { onStreamFinished: root._dispatch(root.p2._handler, root.p2._printerCfg, text) }
+        stdout: StdioCollector { onStreamFinished: { root._dispatch(root.p2._handler, root.p2._printerCfg, text); root._drainQueue() } }
     }
     property var p3: Process {
         property var _printerCfg: null
         property var _handler: null
         command: []; running: false
-        stdout: StdioCollector { onStreamFinished: root._dispatch(root.p3._handler, root.p3._printerCfg, text) }
+        stdout: StdioCollector { onStreamFinished: { root._dispatch(root.p3._handler, root.p3._printerCfg, text); root._drainQueue() } }
     }
     property var p4: Process {
         property var _printerCfg: null
         property var _handler: null
         command: []; running: false
-        stdout: StdioCollector { onStreamFinished: root._dispatch(root.p4._handler, root.p4._printerCfg, text) }
+        stdout: StdioCollector { onStreamFinished: { root._dispatch(root.p4._handler, root.p4._printerCfg, text); root._drainQueue() } }
     }
     property var p5: Process {
         property var _printerCfg: null
         property var _handler: null
         command: []; running: false
-        stdout: StdioCollector { onStreamFinished: root._dispatch(root.p5._handler, root.p5._printerCfg, text) }
+        stdout: StdioCollector { onStreamFinished: { root._dispatch(root.p5._handler, root.p5._printerCfg, text); root._drainQueue() } }
     }
     property var p6: Process {
         property var _printerCfg: null
         property var _handler: null
         command: []; running: false
-        stdout: StdioCollector { onStreamFinished: root._dispatch(root.p6._handler, root.p6._printerCfg, text) }
+        stdout: StdioCollector { onStreamFinished: { root._dispatch(root.p6._handler, root.p6._printerCfg, text); root._drainQueue() } }
     }
     property var p7: Process {
         property var _printerCfg: null
         property var _handler: null
         command: []; running: false
-        stdout: StdioCollector { onStreamFinished: root._dispatch(root.p7._handler, root.p7._printerCfg, text) }
+        stdout: StdioCollector { onStreamFinished: { root._dispatch(root.p7._handler, root.p7._printerCfg, text); root._drainQueue() } }
     }
     // One-shot Process for the settings TEST button — see testPrinter().
     property var pTest: Process {
         property var _handler: null
         command: []; running: false
-        stdout: StdioCollector { onStreamFinished: root._dispatch(root.pTest._handler, null, text) }
+        stdout: StdioCollector { onStreamFinished: { root._dispatch(root.pTest._handler, null, text) } }
     }
 }

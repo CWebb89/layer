@@ -58,6 +58,17 @@ FloatingWindow {
         else if (id === "layermind") layermindView.refresh()
     }
 
+    // A view only ever refreshed when you switched to it, so the view the shell
+    // starts on stayed on its empty state: G-CODE FILES read "no gcode files on
+    // the printer", HISTORY "0 of 0 jobs", CONSOLE blank. The data is fetched on
+    // open now, once the first poll has established the connection.
+    Component.onCompleted: initialRefresh.start()
+    Timer {
+        id: initialRefresh
+        interval: 1200
+        onTriggered: win.refreshView(win.activeView)
+    }
+
     function switchView(id) {
         if (!id || id === win.activeView) {
             refreshView(id || win.activeView)
