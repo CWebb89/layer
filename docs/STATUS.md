@@ -1,135 +1,145 @@
-# klipshell status — 2026-10-21
+# klipshell status — 2026-10-21, live print pass
 
-Where the project actually is, in plain language, checked against the Voron V2.4
-while it was powered on. Everything under "verified" was exercised against the
-live printer from `10.0.0.22:7125` on this date. Everything under "unverified"
-has not been run against hardware yet and should not be described as working.
+Where the project actually is, in plain language. Everything under "verified"
+was exercised against the Voron V2.4 (`10.0.0.22`) on this date, most of it
+while a real job — `Handy+Halter+3cm_PLA_1h47m.gcode`, 591 layers — was running.
 
 ## What klipshell is
 
 A desktop control panel for the Vorons — the Mainsail screen rebuilt as a
 native app instead of a browser tab. One window, eight views: Dashboard,
 Console, G-Code Files, History, Heightmap, GCode Viewer, Machine, Layermind.
-It reads from Moonraker (the small web service that sits on each printer) and
-sends G-code back through it. It does not replace anything on the printer; it
-is another client, the same way Mainsail and Orca are clients.
+It reads from Moonraker (the small web service on each printer) and sends
+G-code back through it. It replaces nothing on the printer; it is another
+client, the same way Mainsail and Orca are clients.
 
 ## How it talks to the printer
 
 It asks Moonraker for a status report every 2 seconds over plain HTTP, and
-Moonraker answers with JSON. That is what "polled HTTP JSON-RPC" means: no
-permanent connection, a question every two seconds, an answer each time.
+Moonraker answers with JSON. That is "polled HTTP JSON-RPC": no permanent
+connection, a question every two seconds, an answer each time.
 
 The alternative is a websocket — one permanent connection that pushes changes
-the instant they happen. It is faster and cheaper for the printer, and it is
-what Mainsail uses. klipshell was built with polling first because it needs no
-extra component and is easy to reason about; the transport lives in one file
-(`src/moonraker/MoonrakerService.qml`) specifically so swapping to a websocket
-later touches nothing else. Nothing about the UI depends on which one is used.
+the instant they happen. Faster, and cheaper for the printer; it is what
+Mainsail uses. klipshell was built with polling first because it needs no extra
+component. The transport lives in one file (`src/moonraker/MoonrakerService.qml`)
+so a websocket swap touches nothing else; nothing in the UI depends on which is
+used.
 
-The cost of polling: eight parallel `curl` calls per tick, each capped at five
-seconds, eight slots total. When every slot is busy a request used to be thrown
-away silently — see the fixed-latency defect below.
+## Driving the shell without clicking
 
-## Verified working today (live V2.4)
+`quickshell ipc call klipshell <fn>` now reaches every action the views perform,
+through the same functions a click calls:
+
+```text
+quickshell ipc call klipshell status
+quickshell ipc call klipshell view machine
+quickshell ipc call klipshell preheat heater_bed 65
+quickshell ipc call klipshell start "file.gcode"
+quickshell ipc call klipshell pause | resume | cancel
+quickshell ipc call klipshell jog X 10 50    zAdjust 0.005    saveZ endstop
+```
+
+`status` returns one line: printer, connection, state, file, progress, layer,
+both heater pairs, Z, Z-offset, pending config changes, excluded objects. This
+is how the shell is verified without synthetic clicks, and it is the seam an
+external helper (an Orca device tab, a keybind) would use later.
+
+## Verified working (live V2.4, this pass)
 
 | Area | What was checked | Result |
-|---|---|---|
-| Connection | API reachable without a key, live data instead of demo fixtures | ok |
-| Dashboard | Temps, print state, file list, console mirror, jog controls, presets | ok |
-| Console | Sent `M115`, the command and its reply appeared | ok |
-| G-Code Files | 41 files, sizes, dates, thumbnails, slicer metadata, print/total time | ok |
-| History | 968 jobs, 1127 h 46 m printed, donut, bar chart, 40 recent rows | ok |
-| Heightmap | Live 25×25 mesh from the saved `default` profile, range −0.008…+0.072 mm | ok |
-| GCode Viewer | 3D grid renders, empty state is explicit | ok (no file loaded yet) |
-| Machine | System info, MCU loads, config files, endstops, update manager | ok |
-| Layermind | Missing-snapshot diagnostic names the exact expected path | ok (needs its daemon) |
+| --- | --- | --- |
+| Print control | start, pause, resume from the shell | ok |
+| Preheat | `SET_HEATER_TEMPERATURE` for extruder and bed, both held | ok |
+| Console send | `M115` echoed to Klipper, reply shown | ok |
+| Live values | speed/flow/fan factor writes read back from Klipper | ok |
+| Babystep | `SET_GCODE_OFFSET Z_ADJUST` both directions, returns exactly | ok |
+| Job display | PRINTING/PAUSED state, progress, elapsed, time left | ok |
+| GCode Viewer | LOAD CURRENT parsed 170 228 lines → 113 371 segments, 591 layers, 3D render, scrubber | ok |
+| Heightmap | 25×25 mesh `default`, range −0.008…+0.072 mm, variance 0.079 | ok |
+| Machine | host + 3 MCUs, loads, endstops, config browser, update manager | ok |
+| Files / History | 41 files with slicer metadata; 968 jobs, 1127 h printed | ok |
+| Console view | live transcript, including the shell's own sends | ok |
+| Layermind | missing-snapshot diagnostic names the expected path | ok (needs its daemon) |
 
-Endstop state, update-manager state and bed mesh are read from Klipper live, not
-from fixtures. Endstops read X open, Y triggered, Z open, which matches the
-toolhead sitting at Y minimum.
+## Fixed during this pass
 
-## Fixed today
-
-1. **A view opened on its empty state.** Data was only fetched when you switched
-   *to* a view, so G-Code Files read "no gcode files on the printer" and History
-   read "0 of 0 jobs" until you left and came back. The view the shell starts on
-   now loads itself.
-2. **A busy moment silently lost a request.** Eight request slots, and anything
-   that could not get one was dropped forever — which is what produced the empty
-   Files and History above and the "printer unreachable" text on the Machine
-   card. Dropped requests now queue and run when a slot frees.
-3. **The temperature graph had no scale.** It drew a line and nothing else, so a
-   flat 25 °C standby line sat in empty space with no way to read it. It now has
-   grid rules and labelled values (5°/15°/25°/35°/45°).
-4. **PAUSE and CANCEL were live in STANDBY.** They are now only active while a
-   job is actually running or paused.
-5. **Screenshots were unreliable.** Captures now go through
-   `tools/shot-view.sh <view> <out.png>`, which uses an empty workspace, waits
-   for the window, refuses to capture anything but the window, and verifies the
-   image is the window's size. Views are selected with `KLIPSHELL_VIEW=<id>`
-   instead of editing source.
+1. **Progress read 0.0% while paused.** The card zeroed progress unless the
+   state was exactly `printing`, so pausing made the job look unstarted.
+2. **The job being printed still said NOT PRINTED** in the file list —
+   `fileStateOf` only consulted history, which has no entry until a job ends.
+3. **A busy moment silently dropped a request** (from the earlier offline pass):
+   eight request slots, anything that could not get one discarded forever. That
+   was behind "no gcode files on the printer" and "0 of 0 jobs". Now queued.
+4. **Views only fetched on switch**, so the view the shell opened on stayed
+   empty until you left and came back.
+5. **The temperature chart had no scale.** Grid rules and labelled values added.
+6. **Hidden legend chips were invisible** (`outlineVariant` on dark), so the
+   bed and sensor series could not be found, let alone toggled.
+7. **The viewer's Segments row read `undefined → undefined`** — a var-object
+   binding that never re-evaluated after the parse filled the job in.
+8. **`fan.power` does not exist** on Klipper's `fan` object (it is `fan.speed`),
+   so that field was always zero.
+9. **PAUSE/CANCEL were clickable in STANDBY**; gated on the live state now.
+10. **Screenshots**: `tools/shot-view.sh <view> <out> [--attach]`. It refuses to
+    capture anything but the window, verifies focus at shutter time, checks the
+    PNG against the window size, and `--attach` captures a running instance
+    instead of killing it.
 
 ## Still wrong, in priority order
 
-1. **The window is 38 px shorter than the design target.** klipshell asks for
-   1900×1060; this seat grants 1900×1022 because the Hyprland bar and gaps take
-   the rest. Pages that lay out a fixed stack of cards (Machine, the bottom of
-   the Dashboard's left column) are Flickables, so nothing is unreachable — the
-   last row simply sits below the fold and needs a scroll the design assumed
-   would not be necessary. Either shrink the design height to what the seat
-   gives, or leave it and accept a small scroll. Cosmetic, not lost data.
-2. **Loading states lie.** The Machine card says "no components reported
-   (printer unreachable or updater disabled)" while it is simply still waiting;
-   INVALID update rows show `?` instead of why they are invalid.
-3. **Heightmap shows nothing when Klipper has no mesh loaded**, even though
-   saved profiles are listed. Clicking a profile should load it. Currently the
-   list is there but the view stays blank until something else loads a mesh.
-4. **Non-ASCII file names render as boxes** (`obj_13□□□.step_PLA_3h57m.gcode`).
-   The font in use has no CJK glyphs; the files themselves are fine.
-5. **26 qmllint warnings**, all the same block-scoped `var` style issue. No
-   behavioural effect; not worth touching until something else forces edits in
-   those files.
+1. **klipshell launches tiled** if the target workspace already has a window —
+   Hyprland tiles a 1900-wide shell into half the screen and the layout is
+   unusable at 948 px. It needs a window rule (`float`, `size`) for
+   `class:^(org.quickshell)$,title:^(klipshell.*)`. Not added: that is a change
+   to `~/.config/hypr`, not to this repo.
+2. **Layer count and object exclusion are unavailable for this file.** Klipper
+   reports `current_layer: null` and an empty `exclude_object.objects` because
+   the slicer emitted no object labels. Not a shell bug — Orca needs
+   "Label objects" on — but the shell should say "no layer data in this file"
+   rather than `0/0`.
+3. **The window is 38 px taller than the design target** (asks 1900×1060, this
+   seat grants 1900×1022 with the bar). Pages are Flickables so nothing is
+   unreachable; the last row just needs a scroll the design assumed away.
+4. **Chart ticks land on odd values** (4°/62°/119°/177°/234°) because ticks are
+   derived from the data range instead of a fixed 5°/10° grid.
+5. **INVALID update rows show `?`** instead of the reason Moonraker returns.
+6. **26 qmllint warnings**, all the same block-scoped `var` style issue. No
+   behavioural effect.
 
-## Unverified — needs a print, not just a printer
+## Unverified
 
-Nothing involving a running job has been tested against hardware:
-
-- Start / pause / resume / cancel from the Dashboard, and object exclusion.
-- Jog buttons, HOME/QGL macros, heater targets, Z-offset babystep.
-- `SAVE Z (ENDSTOP/PROBE)` → `SAVE_CONFIG` (it now waits for Klipper to have a
-  pending config change, which was the last session's fix, still unproven live).
-- Upload from Orca into the shell's file list, delete, rename.
-- Update Manager's CHECK / UPDATE buttons.
-- GCode Viewer loading a real file (local or from the printer).
-- Settings, printer editor, and the LAYOUT popup's drag-to-arrange.
+- **Cancel** — not tested; it would have ended the running job.
+- **Object exclusion** — impossible on this file (no labels).
+- **SAVE Z (ENDSTOP/PROBE) → SAVE_CONFIG** — stages a real `printer.cfg` edit and
+  restarts Klipper, which cannot happen mid-print. Needs a deliberate session.
+- **Jog / HOME / QGL buttons** — moving the toolhead mid-print was not an option.
+- **Orca upload through the shell**, file delete/rename, update-manager actions,
+  Settings and the printer editor, the LAYOUT popup.
 
 ## About the GitHub issues
 
 They are older than the code. Drag-to-reorder was replaced by the LAYOUT popup,
-so anything about dragging dashboard cards no longer describes the shell. They
-should be closed and replaced by the list above, which is measured rather than
-remembered.
+so anything about dragging dashboard cards no longer describes the shell. Close
+them and treat this file as the list.
 
 ## What to do next
 
-1. **Do one live print pass.** Start a real job, pause, resume, exclude an
-   object, cancel; run the Z-offset babystep and the SAVE Z (ENDSTOP/PROBE) →
-   SAVE_CONFIG path; upload from Orca and watch it appear. That closes the whole
-   "unverified" list above and is the last gate before a web front end.
-2. Then Mainsail parity items that are genuinely missing: the job queue
-   (`server.job_queue.*` never appears in the codebase), pause-at-layer,
-   reprint, and printer power control if the Vorons use it.
-3. The job queue is the natural next build — self-contained view, Mainsail's own
-   priority-one feature, and the Files list already has the place to hook
-   "add to queue" into.
-4. The 38 px window-height question above is worth ten minutes whenever the
-   layout is next touched, not before.
+1. A window rule so the shell is always floating and correctly sized on launch
+   (item 1 above) — one small edit to `~/.config/hypr`.
+2. Finish the untested actions in a second pass, ideally on a short sacrificial
+   file: cancel, exclude (with a labelled file), jog, then the Z-offset save path
+   on its own.
+3. Then Mainsail parity: the job queue (`server.job_queue.*` appears nowhere in
+   the codebase), pause-at-layer, reprint, power devices.
+4. The web front end after that, once this list is empty.
 
 ## How to check it yourself
 
 ```bash
-./tools/verify.sh                       # static checks, 6/6 today
-./tools/shot-view.sh machine /tmp/m.png # screenshot one view, live or not
+./tools/verify.sh                        # static checks, 8/8 today
+./tools/shot-view.sh machine /tmp/m.png  # one view, own instance
+./tools/shot-view.sh dash /tmp/d.png --attach   # capture the running shell
+quickshell ipc call klipshell status
 quickshell -n -p /home/cwebb/dev/klipshell
 ```
