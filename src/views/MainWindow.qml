@@ -25,6 +25,7 @@ FloatingWindow {
     property string activeView: "dash"
     property bool printerMenuOpen: false
     property bool settingsOpen: false
+    property bool layoutOpen: false
 
     readonly property var ordered: [
         { id: "dash", label: "DASHBOARD", icon: Icons.dashboard },
@@ -179,13 +180,14 @@ FloatingWindow {
         }
     }
 
-    // The layout mode, its dialog and dashboard.json all belong to the dashboard;
-    // this only carries the request there. Leaving settings first matters — the
-    // popup's scrim and the layout scrim would otherwise stack.
+    // The LayoutPopup edits the dashboard's own order/panels and persists them
+    // to dashboard.json, so opening it from Settings means leaving Settings
+    // first — the two scrims would otherwise stack. Switch to the dashboard as
+    // well so the live tab behind the scrim is the thing being arranged.
     function openLayout() {
         win.settingsOpen = false
         win.switchView("dash")
-        dashView.customizing = true
+        win.layoutOpen = true
     }
 
     // ── Sidebar ────────────────────────────────────────────────────────
@@ -254,6 +256,52 @@ FloatingWindow {
                         }
                     }
                 }
+            }
+        }
+
+        // ── Dashboard layout editor (opens the drag-to-arrange popup) ──
+        Item {
+            id: layoutBtn
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.leftMargin: Metrics.spacing
+            anchors.rightMargin: Metrics.spacing
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: Metrics.panelPadding + 34 + 6 + 30 + 6
+            height: 30
+            Rectangle {
+                anchors.fill: parent
+                radius: Metrics.radiusSmall
+                color: layoutMouse.containsMouse ? Colors.hoverFill : Colors.surfaceContainer
+                border.width: Metrics.borderWidth
+                border.color: Colors.alpha(Colors.outlineVariant, 0.8)
+            }
+            Row {
+                anchors.left: parent.left
+                anchors.leftMargin: 8
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 6
+                Text {
+                    text: Icons.grid
+                    font.family: Type.family
+                    font.pixelSize: Type.iconInline
+                    color: layoutMouse.containsMouse ? Colors.accent : Colors.textSecondary
+                }
+                Text {
+                    text: "LAYOUT"
+                    font.family: Type.family
+                    font.pixelSize: Type.sizeSmall
+                    font.bold: true
+                    color: layoutMouse.containsMouse ? Colors.accent : Colors.surfaceVariantText
+                }
+            }
+            MouseArea {
+                id: layoutMouse
+                anchors.fill: parent
+                acceptedButtons: Qt.LeftButton
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: win.openLayout()
             }
         }
 
@@ -485,7 +533,7 @@ FloatingWindow {
         id: bodyCard
         // Nothing behind the settings popup should hover, click or scroll —
         // the scrim's MouseArea only covers clicks.
-        enabled: !win.settingsOpen
+        enabled: !win.settingsOpen && !win.layoutOpen
         x: win.sidebarWidth
         y: 0
         width: parent.width - win.sidebarWidth
@@ -592,6 +640,16 @@ FloatingWindow {
         onResetRequested: win.confirmBridge.ask("Reset every setting to its default? Jog steps, macro order, units, shell knobs, the IP mask and per-printer API keys all go back to stock.", { confirm: "RESET", destructive: true, onConfirm: function() { Settings.reset() } })
     }
 
+    // ── Dashboard layout popup (sidebar LAYOUT button) ──────────────
+    LayoutPopup {
+        id: layoutPopup
+        anchors.fill: parent
+        z: 95
+        dashboard: dashView
+        opened: win.layoutOpen
+        onClosed: win.layoutOpen = false
+    }
+
     // ── Keys (single owner) ────────────────────────────────────────────
     Item {
         id: keyCatcher
@@ -655,11 +713,11 @@ FloatingWindow {
                 event.accepted = true
                 return
             }
-            // Layout mode is modal as well — its scrim covers the dashboard — so
-            // it swallows keys rather than letting one switch views underneath it.
-            // Esc and the dialog's DONE are the ways out.
-            if (win.activeView === "dash" && dashView.customizing) {
-                dashView.customizing = false
+            // The layout popup is modal as well — its scrim covers the whole
+            // window — so it swallows keys rather than letting one switch views
+            // underneath it. Esc and its DONE button are the ways out.
+            if (win.layoutOpen) {
+                if (k === Qt.Key_Escape) win.layoutOpen = false
                 event.accepted = true
                 return
             }

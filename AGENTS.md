@@ -7,14 +7,16 @@ of klip-tui; structured to fold into webb-shell as a plugin later.
 
 ## Ground truth
 
-- Current code is authoritative. The design brief: shell grammar
-  (shell/Ui components: section header, panel separator, panel slider,
-  Menu selected-row) + matugen Material-You colors via the same 36-key MD3
+- Current code is authoritative. The design brief: the shell grammar in
+  `src/components` (section headers, separators, sliders, list rows, detail
+  pills) + matugen Material-You colors via the same 36-key MD3
   contract webb-shell consumes (`assets/matugen/klipshell-colors.json`,
   rendered to `~/.cache/matugen/klipshell-colors.json`, watched by `Colors`).
-- klip-tui (Rust TUI) is the feature reference: Moonraker WebSocket JSON-RPC,
-  printers, temps, print state, GCode console. The original Phase 1 scope
-  (polled HTTP JSON-RPC service + Dashboard + Console) is long since passed.
+- klip-tui (the retired Rust TUI) is no longer on this machine; its harvested
+  feature inventory is brain `moonraker/mainsail-feature-inventory.md`. Mainsail
+  is the primary reference — klipshell is a Quickshell rebuild of that surface.
+  The original Phase 1 scope (polled HTTP JSON-RPC service + Dashboard +
+  Console) is long since passed.
 - Project history — the engineering log 2026-09-20 → 2026-09-23, chronological,
   newest last — is `docs/HISTORY.md`. Grep it; it records what was believed on
   the day. Current truth is the project memory
@@ -27,7 +29,8 @@ of klip-tui; structured to fold into webb-shell as a plugin later.
   sidebar view switcher, header chrome, and the single `Keys` owner
   (`Keys.BeforeItem`; Enter switches views, Esc returns to Dashboard).
 - `src/views/`: `Dashboard`, `Console`, `GcodeFiles`, `GcodeViewer`,
-  `Heightmap`, `History`, `Layermind`, `Machine`, `SettingsPopup`.
+  `Heightmap`, `History`, `Layermind`, `Machine`, `SettingsPopup`,
+  `LayoutPopup` (drag-to-arrange editor for the dashboard's cards).
 - `src/components/`: 17 grammar components (Card, Panel, SectionHeader,
   Separator, Slider, ListRow, Gauge, Ring, Donut, Bars, Chart, TempGraphCard,
   KV, Chip, Button, Hero, ConfirmDialog) + `qmldir`.
@@ -46,61 +49,26 @@ of klip-tui; structured to fold into webb-shell as a plugin later.
   `~/.local/state/klipshell/<store>.json`, Layermind under
   `~/.local/state/layermind/<printer>.json`. Never a fixed checkout path.
 
-## shell grammar (as implemented)
+## Shell grammar (as implemented)
 
 - Cards: solid fill (`Card` defaults to `surfaceContainer`; callers pass
   `surfaceContainerLow`/`Lowest` per context), `outlineVariant` border at
   `Metrics.cardBorderWidth` (2px), radius `Metrics.radiusLarge/Medium/Small`.
 - Section headers: bold, `Colors.textTertiary` (surfaceVariantText @ 70%,
   5.6:1 against the 14.3:1 of textPrimary), `Type.sizeCaption` — not accent,
-  not ALL-CAPS (section header).
+  not ALL-CAPS (`SectionHeader`).
 - Separators: 1px rule, `Colors.separator` = textPrimary @ 12% alpha
-  (panel separator).
+  (`Separator`).
 - Selection: accent text on `Colors.selectedFill` (textPrimary @ 8% fill),
-  subtle border — hover 8%, pressed 22% (Menu selected-row / theme tokens
-  control tokens).
+  subtle border — hover 8%, pressed 22% (`ListRow` / control tokens).
 - Sliders/gauges: track `Metrics.gaugeTrack` (5px) filled with
   `Colors.accent`/textPrimary, knob `Metrics.gaugeKnob` (19px), fill width and
-  knob x animated 140ms OutCubic, knob hover scale 110ms (panel slider).
-- Header = the bar idea: solid surface, first-class chrome.
+  knob x animated 140ms OutCubic, knob hover scale 110ms (`Slider`).
+- Header = solid surface, first-class chrome.
 
-## Verification
+## Verification and API sources
 
-```bash
-./tools/verify.sh
-```
-
-`tools/verify.sh` is the whole gate in one command: it runs every check below,
-reports PASS / FAIL / SKIP per step, exits 1 on any blocking failure, and ends
-with the qmllint warnings that `--silent` hides (advisory — they do not fail the
-gate). Individual steps, when you need just one:
-
-```bash
-bash -O globstar -c 'qmllint --silent shell.qml src/**/*.qml'
-bash -n install.sh
-bash -n launch.sh
-node src/gcode/test-parse.js
-node src/config/test-settings.js
-python3 tools/check-icons.py
-python3 tools/test-transport.py
-```
-
-`--silent` plus the repo's `.qmllint.ini` (which disables the `UncreatableType`
-and `MissingProperty` warnings) means the qmllint gate reports errors only — a
-clean run says nothing about warnings. `tools/verify.sh` therefore always runs a
-second, non-silent pass and prints it.
-
-`tools/check-icons.py` validates the `Icons` singleton's glyphs.
-`src/config/test-settings.js` covers the settings store's pure logic in
-`settings-logic.js`.
-
-`tools/test-transport.py` boots the app against a stub Moonraker on a loopback
-port and asserts the JSON-RPC result envelope handling (POST replies are wrapped
-in `{"result": …}`), path/quote escaping, and the signals the views listen to.
-It needs a Hyprland seat; without one it exits 2 and skips.
-
-`quickshell -p .` is a nonterminating visual run on a Hyprland seat — not a
-pass/fail check; runtime validation needs a live session.
+`tools/verify.sh` is the single gate command; the individual check steps, what each one proves, and the API/doc sources for Quickshell and Moonraker live in `AGENTS-REFERENCE.md`. Load it before running checks or resolving an API question.
 
 ## Version control & rollback
 
@@ -144,8 +112,3 @@ quickshell -n -p /home/cwebb/dev/klipshell
   time, including for `shot app` one-shot captures.
 - Never `pkill quickshell`: webb-shell runs under the same binary. Scope kills
   with `-p <dir>` so only the klipshell config dies.
-
-## API sources
-
-Installed `.qmltypes` first (`/usr/lib/qt6/qml/Quickshell`), webb-shell repo
-patterns, quickshell.org docs matching version 0.3.1, doc.qt.io/qt-6.

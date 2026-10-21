@@ -6,5 +6,6 @@ Heightmap 1.0 Heightmap.qml
 History 1.0 History.qml
 Machine 1.0 Machine.qml
 SettingsPopup 1.0 SettingsPopup.qml
+LayoutPopup 1.0 LayoutPopup.qml
 Layermind 1.0 Layermind.qml
 MainWindow 1.0 MainWindow.qml

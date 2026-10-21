@@ -75,6 +75,19 @@ QtObject {
     // whole dedupe: every poll re-serves the same ring. -1 means "first
     // fetch" — its backlog is baseline, not news.
     property real _storeTime: -1
+    // Transcript rows are single-line, but Klipper responses carry HTML link
+    // tags and embedded newlines (QGL probe-point dumps). Normalize both so a
+    // row never breaks its fixed height.
+    function _cleanStore(list) {
+        if (!list || list.length === undefined) return list
+        var out = []
+        for (var i = 0; i < list.length; i++) {
+            var e = list[i]
+            var m = String(e?.message ?? "").replace(/<a\s[^>]*>/g, "").replace(/<\/a>/g, "")
+            out.push({ type: e?.type ?? "", time: e?.time ?? 0, message: m.replace(/[\r\n]+/g, " ") })
+        }
+        return out
+    }
     function _scanStore(list) {
         if (!list || list.length === undefined) return
         var newest = root._storeTime
@@ -161,6 +174,7 @@ QtObject {
         if (!name) return
         root.activePrinter = name
         root.demo = false
+        root._zBaseSet = false
         for (var k in root.data) delete root.data[k]
         root.refresh()
         root.stateChanged()
@@ -212,6 +226,7 @@ QtObject {
             root.activePrinter = root.printers[0].name
         root._missCount = {}
         root.demo = false
+        root._zBaseSet = false
         for (var k in root.data) delete root.data[k]
         root.refresh()
     }
@@ -232,7 +247,10 @@ QtObject {
         }
         root.loading = true
         root._syncObjects()
-        root._get("/printer/objects/query?display_status&extruder&gcode_move&heater_bed&heater_generic&print_stats&toolhead&virtual_sdcard&fan&system_stats&exclude_object",
+        // `configfile=config_changes` is the only honest source for "a config
+        // edit is pending": Z_OFFSET_APPLY_* stages the change, SAVE_CONFIG
+        // writes it, and Klipper clears this list after the restart.
+        root._get("/printer/objects/query?display_status&extruder&gcode_move&heater_bed&heater_generic&print_stats&toolhead&virtual_sdcard&fan&system_stats&exclude_object&configfile=config_changes",
                   root._handleObjects, cfg)
         root._get("/printer/info", root._handleInfo, cfg)
         root._get("/server/temperature_store?include_monitors=false", root._handleTempStore, cfg)
@@ -304,6 +322,8 @@ QtObject {
             state.maxAccel = status.toolhead?.max_accel ?? 0
             state.cruiseRatio = status.toolhead?.minimum_cruise_ratio ?? 0
             state.zOffset = status.gcode_move?.homing_origin?.[2] ?? 0
+            if (!root._zBaseSet) { root.zOffsetBase = state.zOffset; root._zBaseSet = true }
+            state.configChanges = status.configfile?.config_changes ?? []
             state.filamentUsed = status.print_stats?.filament_used ?? 0
             state.layerCurrent = status.print_stats?.info?.current_layer ?? 0
             state.layerTotal = status.print_stats?.info?.total_layer ?? 0
@@ -656,6 +676,7 @@ QtObject {
                 try {
                     if (JSON.parse(raw.trim()).result) {
                         root.demo = false
+                        root._zBaseSet = false
                         root.refresh()
                         root.note("info", "PRINTER BACK ONLINE", pcfg.name)
                     }
@@ -1428,6 +1449,22 @@ QtObject {
         else root.sendGcode("SET_GCODE_OFFSET Z=0")
     }
 
+    // Saveable-config support. Babystepping alone is never persisted: Klipper's
+    // SAVE_CONFIG only writes *pending* config changes, and Z_OFFSET_APPLY_*
+    // is what stages one (see the Klipper G-Codes docs for both commands). So
+    // the card keys SAVE CONFIG off `configfile.config_changes`, not off a
+    // non-zero offset. The baseline is the offset in effect when the shell
+    // connected, which is what CLEAR returns to.
+    property real zOffsetBase: 0
+    property bool _zBaseSet: false
+    readonly property bool zOffsetChanged: root._zBaseSet
+        && Math.abs(Number(root.active?.zOffset ?? 0) - root.zOffsetBase) > 0.0001
+    readonly property var configChanges: root.active?.configChanges ?? []
+    readonly property bool configSavePending: root.configChanges.length > 0
+
+    function saveConfig() { root.sendGcode("SAVE_CONFIG") }
+    function clearZOffset() { root.sendGcode("SET_GCODE_OFFSET Z=" + String(root.zOffsetBase)) }
+
     function extrude(amount, speed) {
         root.sendGcode("M83\nG1 E" + amount + " F" + Math.round((Number(speed) || 25) * 60) + "\nM82")
     }
@@ -1454,7 +1491,7 @@ QtObject {
         if (root.demo) {
             root._demoLines = root._demoLines.concat([{ type: "command", message: String(script), time: 0 }]).slice(-80)
             root.gcodeSent(true, "")
-            root.gcodeStoreFetched(true, root._demoLines)
+            root.gcodeStoreFetched(true, root._cleanStore(root._demoLines))
             return
         }
         var body = { script: script }
@@ -1521,10 +1558,10 @@ QtObject {
     }
 
     function fetchGcodeStore(count) {
-        if (root.demo) { root.gcodeStoreFetched(true, root._demoLines); return }
+        if (root.demo) { root.gcodeStoreFetched(true, root._cleanStore(root._demoLines)); return }
         root._get("/server/gcode_store?count=" + (count || 80), function(cfg, raw) {
             try {
-                var list = JSON.parse(raw.trim()).result?.gcode_store ?? []
+                var list = root._cleanStore(JSON.parse(raw.trim()).result?.gcode_store ?? [])
                 root._scanStore(list)
                 root.gcodeStoreFetched(true, list)
             } catch (e) {

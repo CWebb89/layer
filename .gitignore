@@ -3,6 +3,10 @@
 # committed. install.sh seeds it from printers.example.json on a fresh clone.
 src/config/printers.json
 
+# Mainsail reference checkout — read-only upstream source kept for lookup while
+# building klipshell, not part of the app. Nested git repo, never committed.
+mainsail/
+
 # ImageMagick `info:` dump left in the checkout root by a stray convert(1) call.
 /info
 

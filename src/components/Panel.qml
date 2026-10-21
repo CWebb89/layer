@@ -6,12 +6,6 @@ import "../theme"
 // `anchors.topMargin: parent.bodyTop` + `visible: parent.bodyVisible`.
 // The caller sets `height` (see Dashboard.pHeight for the collapsed-short
 // form) — this shell only renders chrome and exposes body geometry.
-//
-// Drag: on `draggable` panels the header (minus the chevron zone) reports a
-// press-and-drag gesture as GLOBAL pointer coordinates via dragMoved/
-// dragEnded. The dashboard owns hit-testing + reorder — no Quickshell
-// Drag/DropArea machinery here (unverifiable drag semantics on this seat;
-// MouseArea motion tracking + globalPosition are the proven path).
 Item {
     id: root
 
@@ -19,11 +13,8 @@ Item {
     property string icon: ""
     property bool collapsible: true
     property bool collapsed: false
-    property bool draggable: false
     property string pid: root.title
     signal toggled()
-    signal dragMoved(real gx, real gy)
-    signal dragEnded(real gx, real gy)
 
     readonly property int headerH: 34
     readonly property int bodyTop: root.headerH + 6
@@ -123,45 +114,6 @@ Item {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: { root.collapsed = !root.collapsed; root.toggled() }
-        }
-
-        MouseArea {
-            id: headerMouse
-            visible: root.draggable
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.rightMargin: 84
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            acceptedButtons: Qt.LeftButton
-            hoverEnabled: true
-            cursorShape: Qt.OpenHandCursor
-            // Manual drag gesture: track motion from the press point; once
-            // past 6px report global pointer coords. Works while the pointer
-            // leaves the area (press grab), same as the old resize drag.
-            property real _px: -1
-            property real _py: -1
-            property bool _dm: false
-            onPressed: (e) => { headerMouse._px = e.x; headerMouse._py = e.y; headerMouse._dm = false }
-            onMouseXChanged: { headerMouse._track(headerMouse.mouseX, headerMouse.mouseY) }
-            onMouseYChanged: { headerMouse._track(headerMouse.mouseX, headerMouse.mouseY) }
-            function _track(x, y) {
-                if (headerMouse._px < 0) return
-                if (!headerMouse._dm) {
-                    if (Math.abs(x - headerMouse._px) < 6 && Math.abs(y - headerMouse._py) < 6) return
-                    headerMouse._dm = true
-                }
-                var gp = headerMouse.globalPosition
-                root.dragMoved(gp.x + x, gp.y + y)
-            }
-            onReleased: {
-                if (headerMouse._dm) {
-                    var gp = headerMouse.globalPosition
-                    root.dragEnded(gp.x + headerMouse.mouseX, gp.y + headerMouse.mouseY)
-                    headerMouse._dm = false
-                }
-                headerMouse._px = -1
-            }
         }
     }
 }

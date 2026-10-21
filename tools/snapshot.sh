@@ -21,6 +21,7 @@ OUT="$SNAPSHOT_DIR/klipshell-$STAMP-$LABEL.tar.gz"
 tar czf "$OUT" \
   --exclude='__pycache__' \
   --exclude='*.pyc' \
+  --exclude='mainsail' \
   -C "$(dirname "$REPO")" "$(basename "$REPO")"
 
 echo "snapshot: $OUT"

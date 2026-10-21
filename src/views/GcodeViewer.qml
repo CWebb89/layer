@@ -86,6 +86,13 @@ Item {
         var r = root.revision
         return root.job !== null && root.job.done === true
     }
+    // Same trap as `hasJob`: `job.progress` is mutated in place with no signal,
+    // so the readout has to depend on `revision` — otherwise it sat at 0% for
+    // the entire parse and only resolved once the model appeared.
+    readonly property int progressPct: {
+        var r = root.revision
+        return Math.round(Math.max(0, Math.min(1, Number(root.job?.progress ?? 0))) * 100)
+    }
     readonly property bool busy: root.moonraker.gcodeLoading || root.parsing
 
     function baseName(p) {
@@ -293,19 +300,30 @@ Item {
                     Math.round(Number(root.live?.printProgress ?? 0) * root.job.total)))
                 root.stopPlay()
             }
-            view.requestPaint()
+            // A poll lands every few seconds and each repaint re-projects the
+            // whole toolpath, so painting mid-parse is O(n²) again — just at the
+            // poll rate instead of the frame rate. The parse's own completion
+            // paint is the one that matters; skip the rest while it runs.
+            if (!root.parsing) view.requestPaint()
         }
     }
 
     // ── Parse driver ────────────────────────────────────────────────────
+    // Chunked so a multi-megabyte body never blocks the UI thread. The chunk is
+    // sized to ~10 ms of V4 parse (≈1500 lines); a fixed 2500-line tick instead
+    // made a 1.5M-line file wait out the 16 ms interval 600 times (≈10 s of pure
+    // idle) however fast the parser actually was, so the interval is now 1 ms and
+    // the next chunk starts as soon as the event loop is free. The canvas is
+    // deliberately NOT repainted per tick — the progress overlay covers it, and
+    // re-projecting the whole accumulated segment array every frame was O(n²)
+    // rendering of a picture nobody saw. One paint when the job finishes.
     property var parseTimer: Timer {
-        interval: 16
+        interval: 1
         repeat: true
         onTriggered: {
             if (!root.job || root.job.done) { root.parsing = false; root.stop(); return }
-            Gp.step(root.job, 2500)
+            Gp.step(root.job, 1500)
             root.revision = root.revision + 1
-            view.requestPaint()
             if (root.job.done) {
                 root.parsing = false
                 root.stop()
@@ -979,7 +997,7 @@ Item {
                                 horizontalAlignment: Text.AlignHCenter
                                 text: root.moonraker.gcodeLoading
                                     ? "DOWNLOADING " + (root.fileName !== "" ? root.fileName : "")
-                                    : "RENDERING — " + Math.round((root.job?.progress ?? 0) * 100) + "%"
+                                    : "RENDERING — " + root.progressPct + "%"
                                 font.family: Type.family
                                 font.pixelSize: Type.sizeSmall
                                 font.bold: true
@@ -997,7 +1015,7 @@ Item {
                                     color: Colors.accent
                                     width: root.moonraker.gcodeLoading
                                         ? parent.width * 0.35
-                                        : parent.width * (root.job?.progress ?? 0)
+                                        : parent.width * (root.progressPct / 100)
                                 }
                             }
                             Row {

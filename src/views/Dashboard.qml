@@ -7,10 +7,11 @@ import "../components"
 import "../config"
 
 // Mainsail-style dashboard: a model-driven masonry grid of Panel cards.
-// All cards except the pinned Status live in a single draggable `order`;
-// they are spread across 2 columns by height balance and reordered by
-// click-and-drag (drag any card header). A customize dialog (show/hide +
-// collapse) is persisted to ~/.local/state/klipshell/dashboard.json.
+// Every card lives in a single `order` (Status included, no pinning); they
+// are spread across 2 columns by height balance. Reordering, show/hide and
+// collapse all happen in the LayoutPopup (sidebar LAYOUT button), which
+// writes back through `reorder`/`toggle*` and persists to
+// ~/.local/state/klipshell/dashboard.json.
 Item {
     id: root
 
@@ -94,7 +95,7 @@ Item {
 
     // ── Panel registry + model ────────────────────────────────────────
     property var panelDefs: [
-        { id: "status", label: "STATUS", icon: Icons.printer, h: 286, pinned: true, fixed: true },
+        { id: "status", label: "STATUS", icon: Icons.printer, h: 286 },
         { id: "temperature", label: "TEMPERATURE", icon: Icons.thermometer, h: 400 },
         // 372px of measured content + 40 bodyTop + 22 padding (the Column
         // reports its own implicitHeight — logged while sizing this), + 6 slack.
@@ -107,13 +108,9 @@ Item {
     ]
     property var panels: root._defaultPanels()
     property var order: root._defaultOrder()
-    property bool customizing: false
-    property string dragId: ""
-    property string hoverId: ""
-    property bool hoverBefore: false
 
     property var macros: []
-    // The card's list: pinned order from settings, hidden macros removed. The
+    // The card's list: configured order from settings, hidden macros removed. The
     // settings tab still reads `macros` (all of them) so hidden ones can be
     // re-shown.
     readonly property var cardMacros: Settings.macrosVisible(root.macros)
@@ -131,13 +128,14 @@ Item {
     function _defaultOrder() {
         var out = []
         for (var i = 0; i < root.panelDefs.length; i++)
-            if (!root.panelDefs[i].pinned) out.push(root.panelDefs[i].id)
+            out.push(root.panelDefs[i].id)
         return out
     }
-    // balance cards across two columns by running height (status pinned 1st).
+    // Balance the cards across two columns by running height. Status is not
+    // special-cased: it is the first entry of `order`, so the balance puts it
+    // first in the left column exactly as the old pinned path did.
     function _partition() {
         var left = [], right = [], lh = 0, rh = 0
-        if (root.pVisible("status")) { left.push("status"); lh = root._balanceH("status") }
         for (var i = 0; i < root.order.length; i++) {
             var id = root.order[i]
             if (!root.pVisible(id)) continue
@@ -161,11 +159,6 @@ Item {
         for (var i = 0; i < root.panels.length; i++)
             if (root.panels[i].id === id) return root.panels[i]
         return null
-    }
-    function isPinned(id) {
-        for (var i = 0; i < root.panelDefs.length; i++)
-            if (root.panelDefs[i].id === id) return !!root.panelDefs[i].pinned
-        return false
     }
     function fullH(id) {
         for (var i = 0; i < root.panelDefs.length; i++)
@@ -203,6 +196,9 @@ Item {
         if (id === "extruder") return root._extruderHeight()
         if (id === "macros") return root._macrosHeight()
         if (id === "machine") return root._machineHeight()
+        if (id === "toolhead") return root.fullH("toolhead")
+            + (root.on && (root.moonraker.zOffsetChanged || root.moonraker.configSavePending)
+                ? Metrics.controlHeight + Metrics.md : 0)
         if (id === "console") return root._consoleHeight()
         return root.fullH(id)
     }
@@ -298,7 +294,7 @@ Item {
     }
     function toggleVisible(id) {
         var p = root._findPanel(id)
-        if (!p || root.isPinned(id)) return
+        if (!p) return
         p.visible = !p.visible
         root.panels = root._clonePanels()
         root._save()
@@ -310,102 +306,21 @@ Item {
         root.panels = root._clonePanels()
         root._save()
     }
-    // up/down reorder (dialog backup for drag)
-    function movePanel(id, dir) {
-        var arr = JSON.parse(JSON.stringify(root.order))
-        var idx = arr.indexOf(id)
-        var j = idx + dir
-        if (idx < 0 || j < 0 || j >= arr.length) return
-        var t = arr[idx]
-        arr[idx] = arr[j]
-        arr[j] = t
-        root.order = arr
-        root._save()
-    }
-    // ── drag reorder (manual gesture; MouseArea deltas + globalPosition,
-    //    no Quickshell Drag/DropArea machinery) ──────────────────────────
-    property real _grabOx: 0
-    property real _grabOy: 0
-    property real dragGhostX: 0
-    property real dragGhostY: 0
-    property real dragGhostW: 0
-    property real dragGhostH: 0
-    function _gridRects() {
-        var by = body.globalPosition.y
-        var colW = (body.width - Metrics.lg) / 2
-        var lg = Metrics.lg
-        var p = root._partition()
-        var out = []
-        var ly = by
-        for (var i = 0; i < p.left.length; i++) {
-            var h = root.pHeight(p.left[i])
-            out.push({ id: p.left[i], x: body.globalPosition.x, y: ly, w: colW, h: h })
-            ly += h + lg
-        }
-        ly = by
-        for (var j = 0; j < p.right.length; j++) {
-            var h2 = root.pHeight(p.right[j])
-            out.push({ id: p.right[j], x: body.globalPosition.x + colW + lg, y: ly, w: colW, h: h2 })
-            ly += h2 + lg
-        }
-        return out
-    }
-    function _rectAt(x, y) {
-        var best = null
-        var rects = root._gridRects()
-        for (var i = 0; i < rects.length; i++) {
-            var r = rects[i]
-            if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) best = r
-        }
-        return best
-    }
-    function dragMovedAt(pid, gx, gy) {
-        if (root.dragId !== String(pid)) {
-            var src = null
-            var rects = root._gridRects()
-            for (var i = 0; i < rects.length; i++) if (rects[i].id === String(pid)) src = rects[i]
-            if (src) {
-                root._grabOx = gx - src.x
-                root._grabOy = gy - src.y
-                root.dragGhostW = src.w
-                root.dragGhostH = src.h
-            }
-            root.dragId = String(pid)
-        }
-        root.dragGhostX = gx - root._grabOx
-        root.dragGhostY = gy - root._grabOy
-        var t = root._rectAt(gx, gy)
-        if (t && String(t.id) !== root.dragId) {
-            root.hoverId = String(t.id)
-            root.hoverBefore = gy < t.y + t.h / 2
-        } else {
-            root.hoverId = ""
-        }
-    }
-    function dragEndedAt(pid, gx, gy) {
-        if (root.dragId !== String(pid)) return
-        var t = root._rectAt(gx, gy)
-        if (t && String(t.id) !== root.dragId) {
-            var ly = Math.max(0, Math.min(root.pHeight(String(t.id)), gy - t.y))
-            root.dropReorder(String(t.id), root.dragId, ly)
-        } else {
-            root.endDrag()
-        }
-    }
-    function endDrag() { root.dragId = ""; root.hoverId = "" }
-    function dropReorder(target, source, ly) {
+    // Linear reorder of the shared cards. `before` places the dragged card
+    // ahead of the target instead of after it. `order` is the dashboard's, so
+    // the LayoutPopup drives this rather than mutating the array itself.
+    function reorder(source, target, before) {
         var from = String(source), to = String(target)
+        if (from === to) return
         var arr = JSON.parse(JSON.stringify(root.order))
         var si = arr.indexOf(from)
-        if (si < 0) { root.endDrag(); return }
+        if (si < 0) return
         arr.splice(si, 1)
         var ti = arr.indexOf(to)
-        if (ti < 0) { root.endDrag(); return }
-        var before = ly < root.pHeight(to) / 2
+        if (ti < 0) return
         arr.splice(before ? ti : ti + 1, 0, from)
         root.order = arr
         root._save()
-        root.endDrag()
     }
 
     // ── Persistence ───────────────────────────────────────────────────
@@ -440,7 +355,7 @@ Item {
                     var src = d.panels && Array.isArray(d.panels) ? d.panels : []
                     for (var i = 0; i < src.length; i++) {
                         var id = String(src[i].id || "")
-                        if (!id || root.isPinned(id) || !root.hasDef(id)) continue
+                        if (!id || !root.hasDef(id)) continue
                         if (out.some(function(p) { return p.id === id })) continue
                         out.push({ id: id, visible: !!src[i].visible, collapsed: !!src[i].collapsed })
                         seen[id] = true
@@ -452,7 +367,7 @@ Item {
                     if (d.order && Array.isArray(d.order)) {
                         for (var k = 0; k < d.order.length; k++) {
                             var oid = String(d.order[k] || "")
-                            if (!oid || root.isPinned(oid) || !root.hasDef(oid)) continue
+                            if (!oid || !root.hasDef(oid)) continue
                             if (ord.indexOf(oid) >= 0) continue
                             ord.push(oid)
                         }
@@ -460,9 +375,19 @@ Item {
                     if (ord.length === 0) {
                         ord = root._defaultOrder()
                     } else {
+                        // A card missing from the saved order goes back to its
+                        // natural slot (its panelDefs position), not the end,
+                        // so a file saved before a card existed keeps it where
+                        // the default order puts it.
                         for (var j = 0; j < root.panelDefs.length; j++) {
                             var oid2 = root.panelDefs[j].id
-                            if (!root.isPinned(oid2) && ord.indexOf(oid2) < 0) ord.push(oid2)
+                            if (ord.indexOf(oid2) >= 0) continue
+                            var at = 0
+                            for (var m = 0; m < j; m++) {
+                                var pos = ord.indexOf(root.panelDefs[m].id)
+                                if (pos >= 0 && pos + 1 > at) at = pos + 1
+                            }
+                            ord.splice(at, 0, oid2)
                         }
                     }
                     root.panels = out
@@ -542,26 +467,8 @@ Item {
             visible: root.pVisible(pid)
             collapsed: root.pCollapsed(pid)
             collapsible: true
-            draggable: pid !== "status"
-            opacity: dragId === pid ? 0.45 : 1
             height: root.pHeight(pid)
             onToggled: root.toggleCollapsed(pid)
-            onDragMoved: (gx, gy) => root.dragMovedAt(leg.pid, gx, gy)
-            onDragEnded: (gx, gy) => root.dragEndedAt(leg.pid, gx, gy)
-
-            Rectangle {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.leftMargin: 8
-                anchors.rightMargin: 8
-                height: 3
-                radius: 1
-                color: Colors.accent
-                z: 12
-                visible: dragId !== "" && hoverId === pid
-                anchors.top: parent.top
-                anchors.topMargin: hoverBefore ? 4 : -3
-            }
 
             // STATUS
             Column {
@@ -977,6 +884,32 @@ Item {
                         Button { text: "+0.01";  variant: "plain"; onPressed: root.moonraker.zAdjust(0.01) }
                         Button { text: "+0.025"; variant: "plain"; onPressed: root.moonraker.zAdjust(0.025) }
                         Button { text: "+0.05";  variant: "plain"; onPressed: root.moonraker.zAdjust(0.05) }
+                    }
+                }
+                // Appears only while a babystep is pending (SAVE Z staged it and
+                // Klipper wants a SAVE_CONFIG) or the offset has drifted from
+                // the value the shell saw at connect (CLEAR returns to it).
+                Row {
+                    id: zActions
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    height: Metrics.controlHeight
+                    spacing: Metrics.sm
+                    visible: root.on && (root.moonraker.configSavePending || root.moonraker.zOffsetChanged)
+                    Button {
+                        text: "SAVE CONFIG"
+                        icon: Icons.save
+                        variant: "soft"
+                        height: Metrics.controlHeight
+                        visible: root.on && root.moonraker.configSavePending
+                        onPressed: root.askSaveConfig()
+                    }
+                    Button {
+                        text: "CLEAR"
+                        icon: Icons.clear
+                        variant: "plain"
+                        height: Metrics.controlHeight
+                        visible: root.on && root.moonraker.zOffsetChanged
+                        onPressed: root.moonraker.clearZOffset()
                     }
                 }
                 Row {
@@ -2006,121 +1939,6 @@ Item {
         }
     }
 
-    // ── Drag ghost: follows the pointer while a header drag is active ──
-    Item {
-        visible: root.dragId !== ""
-        z: 40
-        x: root.dragGhostX
-        y: root.dragGhostY
-        width: root.dragGhostW
-        height: root.dragGhostH
-        Rectangle {
-            anchors.fill: parent
-            radius: 0
-            color: Colors.surfaceContainerLow
-            opacity: 0.85
-            border.width: Metrics.cardBorderWidth
-            border.color: Colors.accent
-        }
-    }
-
-    // ── Customize dialog ───────────────────────────────────────────────
-    // Reached from the settings popup (INTERFACE ▸ LAYOUT ▸ OPEN). The scrim
-    // stays on top of the cards on purpose: arranging is done from the dialog,
-    // and eating pointer input is what stops a stray click from jogging an axis
-    // or firing E-STOP while the mode is open.
-    Rectangle {
-        visible: root.customizing
-        z: 60
-        anchors.fill: parent
-        color: Colors.alpha(Colors.background, 0.6)
-        MouseArea {
-            anchors.fill: parent
-            acceptedButtons: Qt.LeftButton
-            hoverEnabled: true
-            onClicked: root.customizing = false
-        }
-    }
-
-    Rectangle {
-        visible: root.customizing
-        z: 70
-        anchors.centerIn: parent
-        width: 360
-        height: 52 + root.order.length * 30 + 36
-        radius: 0
-        color: Colors.surfaceContainerHigh
-        border.width: Metrics.borderWidth
-        border.color: Colors.outlineVariant
-
-        Column {
-            anchors.fill: parent
-            anchors.margins: 8
-            spacing: 4
-
-            Text {
-                width: parent.width
-                height: 22
-                verticalAlignment: Text.AlignVCenter
-                text: Icons.grid + " DASHBOARD LAYOUT"
-                font.family: Type.family
-                font.pixelSize: Type.sizeCaption
-                font.bold: true
-                font.letterSpacing: 1.0
-                color: Colors.textTertiary
-            }
-
-            Repeater {
-                model: root.order
-                delegate: Item {
-                    id: dr
-                    required property var modelData
-                    width: parent.width
-                    height: 30
-                    Row {
-                        anchors.fill: parent
-                        anchors.margins: 3
-                        spacing: 4
-                        Button { text: Icons.up; variant: "plain"; width: 26; height: 24;
-                                 onPressed: root.movePanel(dr.modelData, -1) }
-                        Button { text: Icons.down; variant: "plain"; width: 26; height: 24;
-                                 onPressed: root.movePanel(dr.modelData, 1) }
-                        Text {
-                            width: parent.width - 56 - 30 - 52 - 20
-                            text: root.labelFor(dr.modelData)
-                            font.family: Type.family
-                            font.pixelSize: Type.sizeSmall
-                            font.bold: true
-                            color: Colors.textPrimary
-                            elide: Text.ElideRight
-                        }
-                        // Same two chevrons the card header uses for collapse, so
-                        // the icon means the same thing in both places.
-                        Button { text: root.pCollapsed(dr.modelData) ? Icons.next : Icons.expand
-                                 variant: "plain"; width: 30; height: 24
-                                 onPressed: root.toggleCollapsed(dr.modelData) }
-                        Button { text: root.pVisible(dr.modelData) ? "HIDE" : "SHOW"
-                                 icon: Icons.eye
-                                 variant: root.pVisible(dr.modelData) ? "plain" : "soft"
-                                 width: 52; height: 24
-                                 onPressed: root.toggleVisible(dr.modelData) }
-                    }
-                }
-            }
-
-            Rectangle { width: parent.width; height: 1; color: Colors.separator }
-
-            Button {
-                width: parent.width
-                height: 28
-                text: "DONE"
-                icon: Icons.check
-                variant: "primary"
-                onPressed: root.customizing = false
-            }
-        }
-    }
-
     // ── Bump font helpers / setters (kept on root for reuse) ─────────
     function fmt(v) {
         var n = Number(v)
@@ -2228,6 +2046,17 @@ Item {
         if (root.confirmDialog) root.confirmDialog.ask("Start printing \"" + file + "\"?", {
             confirm: "START PRINT",
             onConfirm: function() { root.moonraker.startPrint(file) }
+        })
+    }
+    // SAVE_CONFIG restarts Klipper, which aborts an active print — the only
+    // case worth a confirmation. Idle saves go straight through.
+    function askSaveConfig() {
+        if (!root.on) return
+        var busy = root.ps?.printState === "printing" || root.ps?.printState === "paused"
+        if (!busy) { root.moonraker.saveConfig(); return }
+        if (root.confirmDialog) root.confirmDialog.ask("Save the config and restart Klipper? The current print will end.", {
+            confirm: "SAVE & RESTART", destructive: true,
+            onConfirm: function() { root.moonraker.saveConfig() }
         })
     }
 }
