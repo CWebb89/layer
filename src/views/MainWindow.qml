@@ -895,5 +895,8 @@ FloatingWindow {
         function exclude(name: string): void { MoonrakerService.excludeObject(name) }
 
         function refresh(): void { win.refreshView(win.activeView) }
+
+        function loadCurrent(): void { gcodeViewerView.loadCurrent() }
+        function viewerFile(): string { return gcodeViewerView.printFile || "-" }
     }
 }

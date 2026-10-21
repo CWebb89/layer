@@ -1132,7 +1132,9 @@ Item {
                         KV {
                             key: "Segments"
                             labelWidth: 104
-                            value: root.job ? (root.job.count + " → " + root.job.travelCount + " travels") : "—"
+                            value: !root.job ? "—"
+                                : (root.parsing ? "parsing…"
+                                    : (root.job.count + " → " + root.job.travelCount + " travels"))
                         }
 
                         Flow {

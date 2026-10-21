@@ -1152,6 +1152,10 @@ QtObject {
     }
 
     function fileStateOf(name) {
+        var live = root.active
+        if (live && live.printFilename === name
+                && (live.printState === "printing" || live.printState === "paused"))
+            return live.printState
         var jobs = root.data?.history?.jobs ?? []
         // The list arrives newest-first (order=desc), so the first match is the
         // job that owns the file right now — an older `completed` run must not

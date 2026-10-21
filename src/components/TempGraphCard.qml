@@ -123,7 +123,7 @@ Item {
                             height: 7
                             radius: 3.5
                             anchors.verticalCenter: parent.verticalCenter
-                            color: root.hidden[leg.modelData.name] ? Colors.outlineVariant
+                            color: root.hidden[leg.modelData.name] ? Colors.alpha(root.seriesColor(leg.modelData.name), 0.45)
                                  : root.seriesColor(leg.modelData.name)
                         }
                         Text {
@@ -134,7 +134,7 @@ Item {
                             font.family: Type.family
                             font.pixelSize: Type.sizeSmall
                             font.bold: true
-                            color: root.hidden[leg.modelData.name] ? Colors.outlineVariant
+                            color: root.hidden[leg.modelData.name] ? Colors.surfaceVariantText
                                  : root.seriesColor(leg.modelData.name)
                         }
                     }

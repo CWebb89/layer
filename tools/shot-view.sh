@@ -77,9 +77,18 @@ if [ "$ATTACH" -eq 1 ]; then
     exit 1
   fi
   win="$(clients | python3 -c '
-import sys, json
+import os, sys, json
+# A killed instance can leave a stale client record in Hyprland until it is
+# reaped, which reads as "two klipshell windows". Only a window whose process
+# is alive is the shell.
+def alive(pid):
+    try:
+        return os.path.exists("/proc/%d" % int(pid))
+    except (TypeError, ValueError):
+        return False
 found = [c for c in json.load(sys.stdin)
-         if c.get("class") == "org.quickshell" and "klipshell" in c.get("title", "")]
+         if c.get("class") == "org.quickshell" and "klipshell" in c.get("title", "")
+         and alive(c.get("pid"))]
 if len(found) > 1:
     print("MULTIPLE")
 elif found:

@@ -52,7 +52,8 @@ Item {
     function stateLabel(s) {
         if (!s) return "NOT PRINTED"
         if (s === "completed") return "COMPLETED"
-        if (s === "printing" || s === "paused" || s === "in_progress") return "PRINTING"
+        if (s === "paused") return "PAUSED"
+        if (s === "printing" || s === "in_progress") return "PRINTING"
         if (s === "cancelled") return "CANCELLED"
         return "ERROR"
     }
@@ -241,7 +242,7 @@ Item {
     }
     readonly property real _progress: root.moonraker.demo
         ? root._demoFill
-        : (!root.on || root.ps?.printState !== "printing"
+        : (!root.on || (root.ps?.printState !== "printing" && root.ps?.printState !== "paused")
             ? 0 : Math.max(0, Math.min(1, Number(root.ps?.printProgress || 0))))
     function _machineHeight() {
         return 196
