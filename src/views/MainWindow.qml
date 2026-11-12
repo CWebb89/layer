@@ -16,8 +16,8 @@ FloatingWindow {
     id: win
 
     color: Colors.background
-    implicitWidth: 1900
-    implicitHeight: 1060
+    implicitWidth: Metrics.windowWidth
+    implicitHeight: Metrics.windowHeight
     title: "klipshell — Moonraker"
 
     readonly property int sidebarWidth: 166
@@ -279,15 +279,27 @@ FloatingWindow {
             }
         }
 
-        // ── Dashboard layout editor (opens the drag-to-arrange popup) ──
-        Item {
-            id: layoutBtn
+        // ── Bottom stack ───────────────────────────────────────────────
+        // One Column owns every control at the foot of the sidebar, so their
+        // spacing is the Column's job. The previous hand-computed bottomMargin
+        // arithmetic put LAYOUT at 98-128, SETTINGS at 62-92 and the demo badge
+        // at 62-106 from the bottom: the badge covered SETTINGS outright and
+        // clipped LAYOUT, which is how the only route into the printer editor
+        // disappeared exactly when demo mode was on.
+        Column {
+            id: sideFoot
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.leftMargin: Metrics.spacing
             anchors.rightMargin: Metrics.spacing
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: Metrics.panelPadding + 34 + 6 + 30 + 6
+            anchors.bottomMargin: Metrics.panelPadding
+            spacing: Metrics.sm
+
+        // ── Dashboard layout editor (opens the drag-to-arrange popup) ──
+        Item {
+            id: layoutBtn
+            width: parent.width
             height: 30
             Rectangle {
                 anchors.fill: parent
@@ -328,12 +340,7 @@ FloatingWindow {
         // ── Global settings gear (opens the tabbed settings popup) ──
         Item {
             id: gearBtn
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.leftMargin: Metrics.spacing
-            anchors.rightMargin: Metrics.spacing
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: Metrics.panelPadding + 34 + 6
+            width: parent.width
             height: 30
             Rectangle {
                 anchors.fill: parent
@@ -376,12 +383,7 @@ FloatingWindow {
         // demo mode is indistinguishable from a live printer without this.
         Rectangle {
             id: demoBadge
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.leftMargin: Metrics.spacing
-            anchors.rightMargin: Metrics.spacing
-            anchors.bottom: printerChip.top
-            anchors.bottomMargin: Metrics.sm
+            width: parent.width
             height: MoonrakerService.demo ? 44 : 0
             visible: height > 0
             radius: Metrics.radiusSmall
@@ -405,12 +407,7 @@ FloatingWindow {
         // ── Printer selector (moved from the top-right header) ──
         Item {
             id: printerChip
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.leftMargin: Metrics.spacing
-            anchors.rightMargin: Metrics.spacing
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: Metrics.panelPadding
+            width: parent.width
             height: 34
             Rectangle {
                 anchors.fill: parent
@@ -475,6 +472,7 @@ FloatingWindow {
                 onClicked: win.printerMenuOpen = !win.printerMenuOpen
             }
         }
+        }
     }
 
     // ── Printer selection popup (lists printers; click to switch) ────────
@@ -505,7 +503,7 @@ FloatingWindow {
                 font.pixelSize: Type.sizeCaption
                 font.bold: true
                 font.letterSpacing: 1.0
-                color: Colors.outlineVariant
+                color: Colors.textTertiary
             }
 
             Repeater {
@@ -721,15 +719,15 @@ FloatingWindow {
         Keys.priority: Keys.BeforeItem
 
         // A click into a text field moves active focus there and Qt clears
-        // `focus` here, which used to leave the global shortcuts dead for the
-        // rest of the session. Claim focus back whenever the field holding it
-        // stops being edited — released, disabled, or hidden because its view or
-        // its prompt went away. Qt emits nothing when a field goes away while it
-        // holds active focus, so this runs on a slow tick: three property reads,
-        // one owner of the focus request, and no re-entrancy to race with.
+        // `focus` here, which leaves the global shortcuts dead. Claim focus back
+        // whenever the field holding it stops being edited — released, disabled,
+        // or hidden because its view or its prompt went away. Qt emits nothing
+        // when a field goes away while it holds active focus, so this runs on a
+        // slow tick and asks the field itself (see TextFocus) whether it is still
+        // focused: one owner of the focus request, no re-entrancy to race with.
         function _reclaimFocus() {
-            var it = Window.activeFocusItem
-            if (it && it.visible && it.enabled && it.acceptableInput !== undefined) return
+            var f = TextFocus.current
+            if (f && f.activeFocus === true) return
             if (keyCatcher.activeFocus) return
             keyCatcher.forceActiveFocus()
         }

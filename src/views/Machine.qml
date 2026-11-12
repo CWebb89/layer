@@ -446,6 +446,7 @@ Item {
 
     Flickable {
         id: mscroll
+        ScrollRail { flickable: mscroll }
         anchors.fill: parent
         clip: true
         contentWidth: width
@@ -935,6 +936,14 @@ Item {
                                     selectionColor: Colors.accentDim
                                     selectedTextColor: Colors.textPrimary
                                     text: root.promptText
+                                    onActiveFocusChanged: {
+                                        if (activeFocus) {
+                                            TextFocus.acquire(this)
+                                            selectAll()
+                                        } else {
+                                            TextFocus.release(this)
+                                        }
+                                    }
                                     onTextEdited: root.promptText = text
                                     onAccepted: root.commitPrompt()
                                 }
@@ -1204,7 +1213,7 @@ Item {
                                         text: "CHECK"; icon: Icons.search
                                         variant: "soft"
                                         active: root.canUpdate
-                                        onPressed: root.moonraker.fetchMachine()
+                                        onPressed: root.moonraker.fetchUpdateInfo(true)
                                     }
                                 }
                             }

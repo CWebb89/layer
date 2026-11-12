@@ -236,12 +236,18 @@ layout or an endpoint.
 
 ## ✦ Known issues
 
-- Dashboard drag-to-reorder doesn't work. `_gridRects()` reads `globalPosition`
-  off a `Column`, where it doesn't exist. The layout dialog is the working path.
-- The GCode viewer is slow to load and its progress readout sticks at 0%.
-- A wrong API key degrades to demo mode silently; two 401s are treated as an
-  unreachable printer. Use *Settings → PRINTERS → TEST*.
-- Transport is polled HTTP, not a WebSocket, so data lags by about a second.
+- **The dashboard's columns run past the bottom of the window.** The page scrolls
+  and shows a scroll rail, but the right column still needs more height than the
+  seat gives.
+- **A poll is ~10 `bash -c curl` processes.** The shell holds CPU at the poll
+  cadence (1 s default) whether or not anything is drawn. The fix is
+  `XMLHttpRequest` inside `MoonrakerService.qml`, the one file transport lives in.
+- **Layer count and object exclusion need slicer labels.** Klipper reports them
+  only for files sliced with "Label objects" on; without it those rows read `—`.
+- **Transport is polled HTTP, not a WebSocket**, so data lags by about a second.
+- **The LayerMind view reads an older snapshot shape than the daemon writes**
+  (nested context array). It renders the flat fields it finds; the rest needs a
+  schema decision on the daemon side.
 
 <br>
 

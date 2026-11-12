@@ -436,6 +436,10 @@ Item {
                         selectedTextColor: Colors.textPrimary
                         clip: true
                         text: root.query
+                        onActiveFocusChanged: {
+                            if (activeFocus) TextFocus.acquire(this)
+                            else TextFocus.release(this)
+                        }
                         onTextEdited: { root.query = text; root._rebuild() }
                         onAccepted: focus = false
                         Keys.onEscapePressed: {
@@ -573,6 +577,7 @@ Item {
 
             Flickable {
                 id: htable
+                ScrollRail { flickable: htable }
                 anchors.left: parent.left
                 anchors.leftMargin: Metrics.panelPadding
                 anchors.right: parent.right

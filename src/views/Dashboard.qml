@@ -89,18 +89,36 @@ Item {
     function limitDisplay(i) {
         return root.limitOverride[root.limits[i].key] ?? root.limitVal(i)
     }
+    // The read-out is optimistic: it shows what you typed until the next poll
+    // reports what Klipper actually accepted. It used to persist forever, so a
+    // limit edited on one printer stayed on screen after switching to another,
+    // and a rejected SET_VELOCITY_LIMIT still looked applied.
+    function setLimitOverride(key, value) {
+        var o = {}
+        for (var k in root.limitOverride) o[k] = root.limitOverride[k]
+        if (value === null) delete o[key]
+        else o[key] = value
+        root.limitOverride = o
+        limitClear.restart()
+    }
+    Timer {
+        id: limitClear
+        interval: 2500
+        repeat: false
+        onTriggered: root.limitOverride = ({})
+    }
     function applyLimit(i, v) {
         var f = root.limits[i]
         var t = String(v).trim().replace(",", ".")
         var n = Number(t)
         if (t === "" || !Number.isFinite(n) || n < 0) return
         if (f.key === "cruiseRatio") {
-            root.limitOverride.cruiseRatio = String(Math.round(n * 100) / 100)
+            root.setLimitOverride("cruiseRatio", String(Math.round(n * 100) / 100))
             root.moonraker.sendGcode("SET_VELOCITY_LIMIT MIN_CRUISE_RATIO=" + (n / 100).toFixed(3))
             return
         }
         var gp = f.key === "maxVelocity" ? "VELOCITY" : f.key === "maxSquareCorner" ? "SQUARE_CORNER_VELOCITY" : "ACCEL"
-        root.limitOverride[f.key] = String(Math.round(n))
+        root.setLimitOverride(f.key, String(Math.round(n)))
         root.moonraker.sendGcode("SET_VELOCITY_LIMIT " + gp + "=" + Math.round(n))
     }
 
@@ -109,8 +127,8 @@ Item {
         function onBucketChanged(bucket) {
             if (bucket === "files") root.allFiles = root.moonraker.data?.files?.entries ?? []
             else if (bucket === "history") root.historyJobs = root.moonraker.data?.history?.jobs ?? []
-            else if (bucket === "machine") root.machine = root.moonraker.data?.machine ?? ({})
         }
+        function onActivePrinterChanged() { root.limitOverride = ({}) }
     }
 
     // ── Panel registry + model ────────────────────────────────────────
@@ -135,7 +153,6 @@ Item {
     // re-shown.
     readonly property var cardMacros: Settings.macrosVisible(root.macros)
     property var consoleLines: []
-    property var machine: ({})
     property string pending: ""
     property bool consoleActive: false
 
@@ -247,7 +264,7 @@ Item {
         id: fillTimer
         interval: 60
         repeat: true
-        running: root.moonraker.demo && root.on
+        running: root.moonraker.demo && root.on && root.visible
         onTriggered: {
             var next = root._demoFill + 0.004
             root._demoFill = next > 0.985 ? 0 : next
@@ -1238,7 +1255,22 @@ Item {
                                 anchors.leftMargin: 8
                                 anchors.rightMargin: 34
                                 verticalAlignment: Text.AlignVCenter
-                                text: root.fmt(Settings.tempValue(hrow.modelData.target))
+                                // Seeded from the printer, not bound to it: a poll
+                                // re-evaluating a binding would rewrite the field
+                                // under the cursor mid-number.
+                                readonly property string live: root.fmt(Settings.tempValue(hrow.modelData.target))
+                                Component.onCompleted: text = live
+                                onLiveChanged: if (!activeFocus) text = live
+                                onActiveFocusChanged: {
+                                    if (activeFocus) {
+                                        TextFocus.acquire(this)
+                                        selectAll()
+                                    } else {
+                                        TextFocus.release(this)
+                                        text = live
+                                    }
+                                }
+                                Keys.onEscapePressed: focus = false
                                 font.family: Type.family
                                 font.pixelSize: Type.sizeSmall
                                 color: Colors.textPrimary
@@ -1578,7 +1610,19 @@ Item {
                                 anchors.leftMargin: 8
                                 anchors.rightMargin: 48
                                 verticalAlignment: Text.AlignVCenter
-                                text: root.limitDisplay(index)
+                                readonly property string live: root.limitDisplay(index)
+                                Component.onCompleted: text = live
+                                onLiveChanged: if (!activeFocus) text = live
+                                onActiveFocusChanged: {
+                                    if (activeFocus) {
+                                        TextFocus.acquire(this)
+                                        selectAll()
+                                    } else {
+                                        TextFocus.release(this)
+                                        text = live
+                                    }
+                                }
+                                Keys.onEscapePressed: focus = false
                                 font.family: Type.family
                                 font.pixelSize: Type.sizeSmall
                                 color: Colors.textPrimary
@@ -1956,6 +2000,7 @@ Item {
     // ── Body ──────────────────────────────────────────────────────────
     Flickable {
         id: scroll
+        ScrollRail { flickable: scroll }
         anchors.fill: parent
         anchors.topMargin: root.chromeBand
         clip: true

@@ -24,7 +24,11 @@ Item {
     function snapshotPath() {
         var e = Quickshell.env("HOME")
         var home = (e && e !== "null") ? e : ""
-        var stem = root.printer.toLowerCase().replace(/[^a-z0-9]/g, "")
+        // The daemon's stem drops the model's version prefix: "Voron V2.4" ->
+        // voron24.json, "Voron V0.2" -> voron02.json. Stripping every
+        // non-alphanumeric character alone produced "voronv24", so the view
+        // reported "no snapshot" for a file that was sitting right there.
+        var stem = root.printer.toLowerCase().replace(/v(?=\d)/g, "").replace(/[^a-z0-9]/g, "")
         return home + "/.local/state/layermind/" + stem + ".json"
     }
 
@@ -67,34 +71,56 @@ Item {
         return Colors.textPrimary
     }
 
+    // The daemon writes an array holding one context object; the view was
+    // written against a bare object, so a real snapshot parsed to `[]` and drew
+    // no rows at all. Accept either shape, then walk the object one level deep:
+    // every interesting field lives inside `summary` / `health` / `current_state`.
     function render() {
-        var out = []
         var c = root.context
-        if (!c) { root.rows = out; return }
-        for (var k in c) {
-            var v = c[k]
-            if (k === "type" || k === "schema") continue
-            if (typeof v === "string" || typeof v === "number") {
-                out.push({ kind: "kv", key: k, value: String(v) })
-            }
-        }
-        var listKey = ""
-        for (var kk in c) {
-            var vv = c[kk]
-            if (Array.isArray(vv) && vv.length > 0 && typeof vv[0] === "string") {
-                listKey = kk
-                break
-            }
-        }
-        if (listKey !== "") {
-            var arr = c[listKey]
-            for (var i = 0; i < arr.length; i++) {
-                var s = String(arr[i])
-                var clean = s.charAt(0) === "-" ? s.slice(1).trim() : s
-                out.push({ kind: "line", text: clean, color: root._lineColor(s) })
+        if (Array.isArray(c)) c = c.length > 0 ? c[0] : null
+        var out = []
+        if (!c || typeof c !== "object") { root.rows = out; return }
+        root._flatten(c, "", out, 30)
+        if (out.length >= 30) out.push({ kind: "line", text: "… more fields not shown", color: Colors.textTertiary })
+        var list = root._firstStringArray(c, 0)
+        if (list !== null) {
+            for (var i = 0; i < list.length && i < 8; i++) {
+                var s = String(list[i])
+                out.push({ kind: "line", text: s.charAt(0) === "-" ? s.slice(1).trim() : s, color: root._lineColor(s) })
             }
         }
         root.rows = out
+    }
+
+    function _flatten(o, prefix, out, cap) {
+        for (var k in o) {
+            if (k === "type" || k === "schema") continue
+            var v = o[k]
+            if (v === null || v === undefined) continue
+            if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+                if (out.length >= cap) return
+                out.push({ kind: "kv", key: prefix + k, value: typeof v === "number" ? String(Math.round(v * 1000) / 1000) : String(v) })
+            } else if (typeof v === "object" && !Array.isArray(v) && prefix === "") {
+                root._flatten(v, k + ".", out, cap)
+                if (out.length >= cap) return
+            }
+        }
+    }
+
+    function _firstStringArray(o, depth) {
+        for (var k in o) {
+            var v = o[k]
+            if (Array.isArray(v) && v.length > 0 && typeof v[0] === "string") return v
+        }
+        if (depth >= 1) return null
+        for (var kk in o) {
+            var vv = o[kk]
+            if (vv && typeof vv === "object" && !Array.isArray(vv)) {
+                var found = root._firstStringArray(vv, depth + 1)
+                if (found !== null) return found
+            }
+        }
+        return null
     }
 
     property var reTimer: Timer {
@@ -189,14 +215,15 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
                             spacing: Metrics.sm
                             Text {
-                                width: 160
+                                width: 320
                                 text: rowItem.modelData.key ?? ""
                                 font.family: Type.family
                                 font.pixelSize: Type.sizeSmall
                                 color: Colors.surfaceVariantText
+                                elide: Text.ElideRight
                             }
                             Text {
-                                width: Math.max(60, (rowItem.width || 0) - 160 - Metrics.sm)
+                                width: Math.max(60, (rowItem.width || 0) - 320 - Metrics.sm)
                                 text: rowItem.modelData.value ?? ""
                                 font.family: Type.family
                                 font.pixelSize: Type.sizeSmall

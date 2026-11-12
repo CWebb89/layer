@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import "../theme"
+import "../components"
 import "../config"
 
 // GCode console: scrolled transcript from /server/gcode_store + keyboard-first
@@ -95,7 +96,7 @@ Item {
 
     Item {
         anchors.fill: parent
-        anchors.margins: Metrics.panelPadding
+        anchors.margins: Metrics.panelMargin
 
         // Terminal viewport: darker than the page, bordered, rows inset so the
         // transcript never touches the frame.
@@ -108,12 +109,13 @@ Item {
             anchors.bottomMargin: Metrics.sectionGap
             color: Colors.surfaceContainerLowest
             radius: Metrics.radiusMedium
-            border.width: Metrics.borderWidth
+            border.width: Metrics.cardBorderWidth
             border.color: Colors.outlineVariant
             clip: true
 
             Flickable {
                 id: cscroll
+                ScrollRail { flickable: cscroll }
                 anchors.fill: parent
                 anchors.margins: 12
                 clip: true
@@ -172,7 +174,7 @@ Item {
             height: Metrics.controlHeight
             color: Colors.surfaceContainerLow
             radius: Metrics.radiusSmall
-            border.width: Metrics.borderWidth
+            border.width: Metrics.cardBorderWidth
             border.color: Colors.outlineVariant
             clip: true
 
@@ -210,6 +212,7 @@ Item {
                 height: 17
                 color: Colors.textPrimary
                 SequentialAnimation on opacity {
+                    running: root.visible
                     loops: Animation.Infinite
                     NumberAnimation { to: 0.15; duration: 520 }
                     NumberAnimation { to: 1.0; duration: 520 }

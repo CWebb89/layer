@@ -251,6 +251,10 @@ Item {
 
         Item {
             id: emptyState
+            // Above the body Row: the plot's opaque backdrop is declared after
+            // this item and painted over it, so the message for a printer with
+            // no usable mesh was drawn underneath a black rectangle.
+            z: 10
             anchors.fill: parent
             anchors.topMargin: parent.bodyTop
             visible: !root.hasMesh
@@ -531,6 +535,7 @@ Item {
             // ── Side rail ──────────────────────────────────────────────────
             Flickable {
                 id: side
+                ScrollRail { flickable: side }
                 width: 322
                 height: parent.height
                 clip: true

@@ -11,7 +11,9 @@ KV 1.0 KV.qml
 Panel 1.0 Panel.qml
 Ring 1.0 Ring.qml
 ListRow 1.0 ListRow.qml
+ScrollRail 1.0 ScrollRail.qml
 SectionHeader 1.0 SectionHeader.qml
 Separator 1.0 Separator.qml
 Slider 1.0 Slider.qml
 TempGraphCard 1.0 TempGraphCard.qml
+singleton TextFocus 1.0 TextFocus.qml

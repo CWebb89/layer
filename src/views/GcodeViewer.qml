@@ -1003,8 +1003,18 @@ Item {
                         visible: !root.job
                         anchors.centerIn: parent
                         width: parent.width * 0.7
+                        height: emptyLabel.height + Metrics.xl * 2
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: Metrics.radiusMedium
+                            color: Colors.surfaceContainerLow
+                            border.width: Metrics.borderWidth
+                            border.color: Colors.outlineVariant
+                        }
                         Text {
-                            width: parent.width
+                            id: emptyLabel
+                            anchors.centerIn: parent
+                            width: parent.width - Metrics.xl * 2
                             horizontalAlignment: Text.AlignHCenter
                             wrapMode: Text.Wrap
                             text: root.busy
@@ -1142,6 +1152,7 @@ Item {
 
                 Flickable {
                     id: rail
+                    ScrollRail { flickable: rail }
                     width: root.railW
                     height: parent.height
                     clip: true

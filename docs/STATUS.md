@@ -1,7 +1,7 @@
 # klipshell status — 2026-10-21, live print pass
 
 Where the project actually is, in plain language. Everything under "verified"
-was exercised against the Voron V2.4 (`10.0.0.22`) on this date, most of it
+was exercised against the Voron V2.4 on this date, most of it
 while a real job — `Handy+Halter+3cm_PLA_1h47m.gcode`, 591 layers — was running.
 
 ## What klipshell is
@@ -123,17 +123,17 @@ external helper (an Orca device tab, a keybind) would use later.
 
 ## Still wrong, in priority order
 
-1. **The dashboard's columns are taller than the window** (right column:
+1. **The dashboard's columns are still taller than the window** (right column:
    400 + 448 + 199 + gaps = 1071 px for ~950 available), so the MACHINE card is
-   sliced by the fold. The page scrolls and the console card already absorbs
-   slack, but nothing pulls the taller column back to fit.
-2. **A poll costs ~0.9 s of CPU.** The shell sits at 42-45% CPU while idle and
-   at 3% with the poll timer stopped, on a window that is not even visible. The
-   cause is the transport: every request is a `bash -c curl` process, ~10 per
-   poll, so the spinner is process spawning, not parsing — a probe spawning
-   `true` instead of `curl` still burned 39%. The fix is `XMLHttpRequest` (a QML
-   JS builtin) inside `MoonrakerService`, the transport-agnostic swap the
-   architecture was written for.
+   below the fold. A scroll rail now marks the overflow on every Flickable, so
+   the content is discoverable; nothing yet pulls the taller column back to fit.
+2. **A poll still spawns ~10 `bash -c curl` processes.** Each request is a
+   process, so the shell burns CPU at the poll cadence even when nothing is
+   drawn. The idle-animation cost that used to sit on top of it is gone: the
+   console caret and the dashboard demo timer are now gated on visibility, which
+   took the render thread from ~20% to 0% on an idle window. The remaining fix is
+   `XMLHttpRequest` (a QML JS builtin) inside `MoonrakerService`, the
+   transport-agnostic swap the architecture was written for.
 3. **Layer count and object exclusion are unavailable for this file.** Klipper
    reports `current_layer: null` and an empty `exclude_object.objects` because
    the slicer emitted no object labels — Orca needs "Label objects" on. The IPC

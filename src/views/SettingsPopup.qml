@@ -612,7 +612,7 @@ Item {
                                 anchors.left: parent.left
                                 anchors.leftMargin: 8
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: root.inputText(1, "10.0.0.3 · 7125")
+                                text: root.inputText(1, "192.168.1.50 · 7125")
                                 font.family: Type.family
                                 font.pixelSize: Type.sizeCaption
                                 color: String(root.inputs[1] || "") !== "" ? Colors.textPrimary : Colors.outlineVariant
@@ -765,7 +765,7 @@ Item {
                             text: "IPs are " + (Settings.maskIps ? "masked" : "visible")
                             font.family: Type.family
                             font.pixelSize: Type.sizeSmall
-                            color: Colors.outlineVariant
+                            color: Colors.textTertiary
                             elide: Text.ElideRight
                             anchors.verticalCenter: parent.verticalCenter
                         }
@@ -1169,7 +1169,7 @@ Item {
                                 text: String(mrow.index + 1)
                                 font.family: Type.family
                                 font.pixelSize: Type.sizeCaption
-                                color: Colors.outlineVariant
+                                color: Colors.textTertiary
                                 verticalAlignment: Text.AlignVCenter
                             }
                             Text {

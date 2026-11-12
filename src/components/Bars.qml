@@ -27,9 +27,22 @@ Item {
         for (var i = 0; i < root.n; i++) m = Math.max(m, Number(root.values[i]) || 0)
         return root.niceMax(m)
     }
+    readonly property real axisStep: {
+        var target = root.axisMax / 5
+        if (!(target > 0)) return 1
+        var exp = Math.pow(10, Math.floor(Math.log(target) / Math.LN10))
+        var f = target / exp
+        var m = f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10
+        return m * exp
+    }
+    // Top gridline is the first multiple of the step at or above the tallest
+    // bar. The old fixed quartile split put lines at 12.5 / 37.5 and labelled
+    // them 13 / 38, so no label sat on its own line.
+    readonly property real axisTop: root.axisStep
+        * Math.max(1, Math.ceil(root.axisMax / root.axisStep - 1e-9))
     readonly property var ticks: {
         var out = []
-        for (var i = 0; i <= 4; i++) out.push(root.axisMax * i / 4)
+        for (var v = 0; v <= root.axisTop + 1e-6; v += root.axisStep) out.push(v)
         return out
     }
 
@@ -43,7 +56,7 @@ Item {
     }
 
     function yOf(v) {
-        return root.padT + (height - root.padT - root.padB) * (1 - v / root.axisMax)
+        return root.padT + (height - root.padT - root.padB) * (1 - v / root.axisTop)
     }
 
     function xOf(i) {
@@ -51,7 +64,9 @@ Item {
     }
 
     function tickText(v) {
-        return v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 0 : 1) + "k" : String(Math.round(v))
+        if (v >= 1000) return (v / 1000).toFixed(v >= 10000 ? 0 : 1) + "k"
+        var n = Math.round(v * 10) / 10
+        return n % 1 === 0 ? String(n) : n.toFixed(1)
     }
 
     Canvas {
@@ -111,8 +126,8 @@ Item {
             horizontalAlignment: Text.AlignRight
             text: root.tickText(modelData)
             font.family: Type.family
-            font.pixelSize: Type.sizeCaption - 2
-            color: Colors.outlineVariant
+            font.pixelSize: Type.sizeCaption - 1
+            color: Colors.textTertiary
         }
     }
 
@@ -129,8 +144,8 @@ Item {
             horizontalAlignment: Text.AlignHCenter
             text: String(modelData)
             font.family: Type.family
-            font.pixelSize: Type.sizeCaption - 2
-            color: Colors.outlineVariant
+            font.pixelSize: Type.sizeCaption - 1
+            color: Colors.textTertiary
         }
     }
 

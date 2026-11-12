@@ -366,6 +366,7 @@ Item {
 
         Flickable {
             id: gtable
+            ScrollRail { flickable: gtable }
             anchors.left: parent.left
             anchors.leftMargin: Metrics.panelPadding
             anchors.right: parent.right

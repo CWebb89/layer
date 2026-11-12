@@ -1212,9 +1212,12 @@ QtObject {
     // check (past the transport's 5 s cap: the response is dropped rather than
     // arriving late) — so an empty parse leaves the last good report alone
     // instead of blanking the card, and the tick retries while nothing landed.
-    function fetchUpdateInfo() {
+    // `force` maps to Moonraker's refresh=true, which re-fetches every
+    // component's remote. Moonraker rate-limits it to once a minute and ignores
+    // it while printing or mid-update, so the CHECK button cannot spam it.
+    function fetchUpdateInfo(force) {
         if (root.demo) { root._seedDemo(root._activeCfg()); return }
-        root._get("/machine/update/status", function(cfg, raw) {
+        root._get("/machine/update/status" + (force ? "?refresh=true" : ""), function(cfg, raw) {
             try {
                 var r = JSON.parse(raw.trim()).result
                 if (r && r.version_info) root._patchMachine({ update: r })
@@ -1309,7 +1312,7 @@ QtObject {
     function updateClient(name) {
         var n = String(name)
         if (root.demo) { root.actionDone(true, "updating " + n); return }
-        root._post("/machine/update/client/" + encodeURIComponent(n), null, root._action("updating " + n))
+        root._post("/machine/update/client", { name: n }, root._action("updating " + n))
     }
 
     function updateSystem() {
