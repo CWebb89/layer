@@ -36,6 +36,10 @@ layer is a desktop control surface for Klipper printers. It talks to
 one keyboard-driven window: dashboard, GCode console, print files, history, bed
 mesh, GCode viewer, machine health, and LayerMind diagnostics.
 
+> **Name.** The program is *layer*. The package that installs it is `layer-app`
+> (`layer` alone is taken on every registry worth publishing to, and the plain
+> word is unsearchable). Search for `layer-app`; run `layer`.
+
 It's QML on [Quickshell](https://quickshell.org/), so there's no browser, no web
 server and no Python daemon. One process, two dependencies: `quickshell` and
 `curl`.

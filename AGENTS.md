@@ -7,6 +7,12 @@ of klip-tui; structured to fold into webb-shell as a plugin later.
 
 ## Ground truth
 
+- **Name: `layer`.** The program, the repo and the directory are `layer`; the
+  distribution name is `layer-app` — AUR, and any registry where the bare word
+  is taken or unsearchable. The family is `layer` (control surface),
+  `next-layer` (slicer), `LayerMind` (diagnostics), `HFW` (engine). Former names:
+  `klip-shell`, `QuickKlipshell`, `klipshell`.
+
 - Current code is authoritative. The design brief: the shell grammar in
   `src/components` (section headers, separators, sliders, list rows, detail
   pills) + matugen Material-You colors via the same 36-key MD3
