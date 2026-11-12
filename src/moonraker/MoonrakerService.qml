@@ -5,7 +5,7 @@ import Quickshell
 import Quickshell.Io
 import "../config"
 
-// Moonraker client for klipshell. Transport is polled HTTP JSON-RPC (curl
+// Moonraker client for layer. Transport is polled HTTP JSON-RPC (curl
 // Process slots) — no extra deps, PrintService-proven. All views read the
 // normalized `data` bucket + the core polled `active` state; a later
 // QtWebsockets swap only replaces the fetch internals below.
@@ -493,7 +493,7 @@ QtObject {
                 seg(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], f)
         }
         var objs = [{ x: 100, y: 100, r: 18 }, { x: 220, y: 210, r: 13 }]
-        out.push("; klipshell demo toolpath \u2014 two parts, 40 layers")
+        out.push("; layer demo toolpath \u2014 two parts, 40 layers")
         out.push("G90")
         out.push("M83")
         out.push("G28")
@@ -1104,7 +1104,7 @@ QtObject {
         var rootName = parts[0]
         var base = parts[parts.length - 1]
         var relDir = parts.length > 2 ? parts.slice(1, parts.length - 1).join("/") : "."
-        var dir = Quickshell.env("HOME") + "/.cache/klipshell/"
+        var dir = Quickshell.env("HOME") + "/.cache/layer/"
             + String(cfg.name).replace(/[^A-Za-z0-9_-]+/g, "_") + "/edit"
         var local = dir + "/" + base.replace(/[^A-Za-z0-9._-]+/g, "_")
         var dl = root._url(cfg, "/server/files/" + root._encPath(path))
@@ -1125,13 +1125,13 @@ QtObject {
         })
     }
 
-    // Download a log file (klippy.log etc.) to ~/.cache/klipshell/<p>/logs.
+    // Download a log file (klippy.log etc.) to ~/.cache/layer/<p>/logs.
     // Filename is white-listed to [A-Za-z0-9._-] for the local output path;
     // the URL still uses the original name via encodeURIComponent.
     function downloadLog(name) {
         var cfg = root._activeCfg()
         if (!cfg || root.demo) return
-        var dir = Quickshell.env("HOME") + "/.cache/klipshell/"
+        var dir = Quickshell.env("HOME") + "/.cache/layer/"
             + String(cfg.name).replace(/[^A-Za-z0-9_-]+/g, "_") + "/logs"
         var safe = String(name).replace(/[^A-Za-z0-9._-]+/g, "_")
         var out = dir + "/" + safe
@@ -1140,7 +1140,7 @@ QtObject {
         root._fetch(["bash", "-c", "mkdir -p '" + dir + "' && curl -sf '"
             + root._sq(url) + "' -o '" + out + "' && echo ok"], cfg, function(cfg2, text) {
                 if (String(text).indexOf("ok") >= 0)
-                    root.actionDone(true, safe + " → ~/.cache/klipshell/logs")
+                    root.actionDone(true, safe + " → ~/.cache/layer/logs")
                 else
                     root.actionDone(false, "download failed: " + safe)
             })

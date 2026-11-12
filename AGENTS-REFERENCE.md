@@ -1,4 +1,4 @@
-# AGENTS-REFERENCE.md — klipshell
+# AGENTS-REFERENCE.md — layer
 
 Durable reference moved out of `AGENTS.md` on 2026-10-05. `AGENTS.md` auto-loads in
 every session in this repo; this file does not. Load it when a turn touches one of

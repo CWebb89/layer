@@ -95,7 +95,7 @@ GROUPS = [
 HEADER = '''pragma Singleton
 import QtQuick
 
-// Nerd Font glyph set for klipshell.
+// Nerd Font glyph set for layer.
 //
 // Every codepoint here is verified against the *installed* font by
 // tools/check-icons.py — a glyph the font lacks renders as a tofu box, so do

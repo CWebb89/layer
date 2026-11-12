@@ -123,7 +123,7 @@ QtObject {
     property FileView colorsFile: FileView {
         path: (function() {
             var e = Quickshell.env("HOME")
-            return (e && e !== "null") ? e + "/.cache/matugen/klipshell-colors.json" : ""
+            return (e && e !== "null") ? e + "/.cache/matugen/layer-colors.json" : ""
         })()
         watchChanges: true
         onFileChanged: reload()

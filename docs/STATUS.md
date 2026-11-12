@@ -1,10 +1,10 @@
-# klipshell status — 2026-10-21, live print pass
+# layer status — 2026-10-21, live print pass
 
 Where the project actually is, in plain language. Everything under "verified"
 was exercised against the Voron V2.4 on this date, most of it
 while a real job — `Handy+Halter+3cm_PLA_1h47m.gcode`, 591 layers — was running.
 
-## What klipshell is
+## What layer is
 
 A desktop control panel for the Vorons — the Mainsail screen rebuilt as a
 native app instead of a browser tab. One window, eight views: Dashboard,
@@ -21,23 +21,23 @@ connection, a question every two seconds, an answer each time.
 
 The alternative is a websocket — one permanent connection that pushes changes
 the instant they happen. Faster, and cheaper for the printer; it is what
-Mainsail uses. klipshell was built with polling first because it needs no extra
+Mainsail uses. layer was built with polling first because it needs no extra
 component. The transport lives in one file (`src/moonraker/MoonrakerService.qml`)
 so a websocket swap touches nothing else; nothing in the UI depends on which is
 used.
 
 ## Driving the shell without clicking
 
-`quickshell ipc call klipshell <fn>` now reaches every action the views perform,
+`quickshell ipc call layer <fn>` now reaches every action the views perform,
 through the same functions a click calls:
 
 ```text
-quickshell ipc call klipshell status
-quickshell ipc call klipshell view machine
-quickshell ipc call klipshell preheat heater_bed 65
-quickshell ipc call klipshell start "file.gcode"
-quickshell ipc call klipshell pause | resume | cancel
-quickshell ipc call klipshell jog X 10 50    zAdjust 0.005    saveZ endstop
+quickshell ipc call layer status
+quickshell ipc call layer view machine
+quickshell ipc call layer preheat heater_bed 65
+quickshell ipc call layer start "file.gcode"
+quickshell ipc call layer pause | resume | cancel
+quickshell ipc call layer jog X 10 50    zAdjust 0.005    saveZ endstop
 ```
 
 `status` returns one line: printer, connection, state, file, progress, layer,
@@ -176,6 +176,6 @@ them and treat this file as the list.
 ./tools/verify.sh                        # static checks, 8/8 today
 ./tools/shot-view.sh machine /tmp/m.png  # one view, own instance
 ./tools/shot-view.sh dash /tmp/d.png --attach   # capture the running shell
-quickshell ipc call klipshell status
-quickshell -n -p /home/cwebb/dev/klipshell
+quickshell ipc call layer status
+quickshell -n -p /home/cwebb/dev/layer
 ```

@@ -245,7 +245,7 @@ Item {
     }
 
     function _statePath() {
-        return (Quickshell.env("HOME") || "~") + "/.local/state/klipshell/viewer.json"
+        return (Quickshell.env("HOME") || "~") + "/.local/state/layer/viewer.json"
     }
 
     function saveSettings() {

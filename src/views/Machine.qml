@@ -4,7 +4,7 @@ import "../theme"
 import "../components"
 
 // Machine health, gcode files, and update manager — Mainsail machine-tab
-// parity in klipshell grammar: files on the left-ish list, system + updates
+// parity in layer grammar: files on the left-ish list, system + updates
 // beside them. Rings mirror Mainsail's SystemLoad panel (reading inside,
 // label under the ring, a dim detail line under that).
 Item {

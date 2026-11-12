@@ -9,7 +9,7 @@ import "../config"
 // Macros, Print.
 // Printer list edits persist through the service; preset edits keep the shared
 // win.presetStore; everything else is the Settings singleton
-// (~/.local/state/klipshell/settings.json). Inline text fields use the
+// (~/.local/state/layer/settings.json). Inline text fields use the
 // console-style key capture: click a field, type, Enter commits, Tab/click
 // moves focus, Esc drops it. While opened, the MainWindow key catcher routes
 // keys here.

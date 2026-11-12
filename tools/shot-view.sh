@@ -1,5 +1,5 @@
 #!/bin/bash
-# klipshell capture harness — one view per invocation, on an unused workspace.
+# layer capture harness — one view per invocation, on an unused workspace.
 #
 # The failure this exists to prevent: launching without first focusing an empty
 # workspace puts the window on whatever workspace the caller is on, so the
@@ -79,7 +79,7 @@ if [ "$ATTACH" -eq 1 ]; then
   win="$(clients | python3 -c '
 import os, sys, json
 # A killed instance can leave a stale client record in Hyprland until it is
-# reaped, which reads as "two klipshell windows". Only a window whose process
+# reaped, which reads as "two layer windows". Only a window whose process
 # is alive is the shell.
 def alive(pid):
     try:
@@ -87,7 +87,7 @@ def alive(pid):
     except (TypeError, ValueError):
         return False
 found = [c for c in json.load(sys.stdin)
-         if c.get("class") == "org.quickshell" and "klipshell" in c.get("title", "")
+         if c.get("class") == "org.quickshell" and "layer" in c.get("title", "")
          and alive(c.get("pid"))]
 if len(found) > 1:
     print("MULTIPLE")
@@ -127,7 +127,7 @@ if [ "$occupied" != "0" ]; then
 fi
 echo "capture workspace: $ws (caller on $caller_ws)"
 
-/usr/bin/hyprctl dispatch "hl.dsp.exec_cmd(\"/usr/bin/env KLIPSHELL_VIEW=$VIEW /usr/bin/quickshell -n -p $REPO\")" >/dev/null
+/usr/bin/hyprctl dispatch "hl.dsp.exec_cmd(\"/usr/bin/env LAYER_VIEW=$VIEW /usr/bin/quickshell -n -p $REPO\")" >/dev/null
 
 win=""
 deadline=$(( $(date +%s) + WAIT ))
@@ -138,7 +138,7 @@ ws = int(sys.argv[1])
 found = [c for c in json.load(sys.stdin)
          if c.get("class") == "org.quickshell"
          and c["workspace"]["id"] == ws
-         and "klipshell" in c.get("title", "")]
+         and "layer" in c.get("title", "")]
 if len(found) > 1:
     print("MULTIPLE")
 elif found:
@@ -152,10 +152,10 @@ done
 
 case "$win" in
   "")
-    echo "no klipshell window appeared on workspace $ws within ${WAIT}s" >&2
+    echo "no layer window appeared on workspace $ws within ${WAIT}s" >&2
     exit 1 ;;
   MULTIPLE)
-    echo "more than one klipshell window on workspace $ws — instance discipline broken" >&2
+    echo "more than one layer window on workspace $ws — instance discipline broken" >&2
     exit 1 ;;
 esac
 fi
@@ -175,7 +175,7 @@ fi
 /usr/bin/hyprctl dispatch "hl.dsp.focus({window=\"address:$w_addr\"})" >/dev/null
 active="$(/usr/bin/hyprctl activewindow -j | python3 -c 'import sys,json; print(json.load(sys.stdin).get("address", ""))')"
 if [ "$active" != "$w_addr" ]; then
-  echo "could not focus the klipshell window ($w_addr); active is '$active'" >&2
+  echo "could not focus the layer window ($w_addr); active is '$active'" >&2
   exit 1
 fi
 

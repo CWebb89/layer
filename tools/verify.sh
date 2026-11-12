@@ -1,5 +1,5 @@
 #!/bin/bash
-# klipshell verification gate — the AGENTS.md command list as one command.
+# layer verification gate — the AGENTS.md command list as one command.
 #
 # Blocking (any failure exits 1): qmllint errors, shell syntax, the three
 # test suites. Advisory: the same qmllint pass with warnings VISIBLE — a

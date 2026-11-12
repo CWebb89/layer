@@ -9,7 +9,7 @@ import "../components"
 import "../config"
 import "."
 
-// klipshell window: left sidebar (brand + view nav + printer selector) over
+// layer window: left sidebar (brand + view nav + printer selector) over
 // a body card. One key catcher owns input: number keys 1-9 / arrow keys /
 // Enter switch views, Esc returns to Dashboard, console gets typing.
 FloatingWindow {
@@ -18,7 +18,7 @@ FloatingWindow {
     color: Colors.background
     implicitWidth: Metrics.windowWidth
     implicitHeight: Metrics.windowHeight
-    title: "klipshell — Moonraker"
+    title: "layer — Moonraker"
 
     readonly property int sidebarWidth: 166
 
@@ -37,11 +37,11 @@ FloatingWindow {
         { id: "layermind", label: "LAYERMIND", icon: Icons.layermind }
     ]
 
-    // Capture seam: KLIPSHELL_VIEW=<id> opens straight on that view, so a
+    // Capture seam: LAYER_VIEW=<id> opens straight on that view, so a
     // screenshot session never edits this file (a save reloads the live
     // instance mid-capture). Any other value, or none, starts on the dashboard.
     property string activeView: {
-        var v = String(Quickshell.env("KLIPSHELL_VIEW") || "")
+        var v = String(Quickshell.env("LAYER_VIEW") || "")
         for (var i = 0; i < win.ordered.length; i++)
             if (win.ordered[i].id === v) return v
         return "dash"
@@ -96,7 +96,7 @@ FloatingWindow {
         ]
 
         function _path() {
-            return (Quickshell.env("HOME") || "~") + "/.local/state/klipshell/presets.json"
+            return (Quickshell.env("HOME") || "~") + "/.local/state/layer/presets.json"
         }
         function save() {
             var f = pstore._path()
@@ -821,13 +821,13 @@ FloatingWindow {
         }
     }
 
-    // Scriptable control surface: `quickshell ipc call klipshell <fn>`. Every
+    // Scriptable control surface: `quickshell ipc call layer <fn>`. Every
     // entry here is the function the views call, so an action exercised over IPC
     // is the same code path a click takes. It exists to drive the shell during
     // live verification, and it is the seam a companion helper (the Orca device
     // tab, a script, a keybind) can use without the UI.
     IpcHandler {
-        target: "klipshell"
+        target: "layer"
 
         function status(): string {
             var p = MoonrakerService.active

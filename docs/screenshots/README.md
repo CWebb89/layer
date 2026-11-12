@@ -17,7 +17,7 @@ README's Screenshots section uses all eight.
 
 Still wanted: `settings.png`, the six-tab popup. It is an in-window scrim
 overlay, not a layer surface, so `shot window` is its capture tool. `shot popup`
-is for real layer-shell surfaces, which klipshell doesn't open.
+is for real layer-shell surfaces, which layer doesn't open.
 
 The demo video lives in `../video/`.
 
@@ -57,7 +57,7 @@ how the demo video's tour was mapped.
 
 ## Demo video
 
-`../video/klipshell-demo.mp4` came from a 1920×1080 60fps H.264 MKV recorded at
+`../video/layer-demo.mp4` came from a 1920×1080 60fps H.264 MKV recorded at
 07:23 on 2026-09-27 (13 MB). It carried a digitally silent Opus track, so the
 audio was dropped rather than transcoded. Re-encoded to CRF 23, `-preset slow`,
 with `+faststart` for progressive playback: 8.1 MB, same 1080p60.
@@ -67,10 +67,10 @@ magick frame.png -crop 1911x1071+0+0 +repage -resize 1400x -strip \
   -fill 'rgba(20,19,24,0.72)' -stroke '#c8bfff' -strokewidth 3 \
   -draw 'circle 700,392 700,326' -stroke none -fill '#c8bfff' \
   -draw 'polygon 686,366 732,392 686,418' -quality 90 \
-  docs/video/klipshell-demo-poster.jpg
+  docs/video/layer-demo-poster.jpg
 
 ffmpeg -i source.mkv -c:v libx264 -crf 23 -preset slow -pix_fmt yuv420p -an \
-  -movflags +faststart docs/video/klipshell-demo.mp4
+  -movflags +faststart docs/video/layer-demo.mp4
 ```
 
 The poster is a real frame from 18s (the bed mesh), with the play badge drawn on.
@@ -82,9 +82,9 @@ which were checked against the live repo:
 
 | URL | What happens |
 |---|---|
-| `/blob/main/docs/video/klipshell-demo.mp4` | refuses to play it |
+| `/blob/main/docs/video/layer-demo.mp4` | refuses to play it |
 | `raw.githubusercontent.com/...` | `content-type: application/octet-stream` + `nosniff`, so it downloads |
-| `cdn.jsdelivr.net/gh/CWebb89/Klipshell@main/...` | `content-type: video/mp4`, `accept-ranges: bytes`, plays with seeking |
+| `cdn.jsdelivr.net/gh/CWebb89/Layer@main/...` | `content-type: video/mp4`, `accept-ranges: bytes`, plays with seeking |
 
 The blob page's own payload says why. At 8.07 MB the file is over GitHub's
 threshold, so it is marked unrenderable and the page offers raw instead:
@@ -99,7 +99,7 @@ Checking that flag is how the size threshold was pinned down, since it is in the
 server-rendered payload rather than the visible page:
 
 ```fish
-curl -s https://github.com/CWebb89/Klipshell/blob/main/docs/video/klipshell-demo.mp4 \
+curl -s https://github.com/CWebb89/Layer/blob/main/docs/video/layer-demo.mp4 \
   | python3 -c "import json,re,sys; html=sys.stdin.read(); \
       d=json.loads(re.search(r'react-app.embeddedData\">(.*?)</script>', html, re.S).group(1)); \
       print(d['payload']['codeViewBlobLayoutRoute']['blob'])"

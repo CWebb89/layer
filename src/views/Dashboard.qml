@@ -11,7 +11,7 @@ import "../config"
 // are spread across 2 columns by height balance. Reordering, show/hide and
 // collapse all happen in the LayoutPopup (sidebar LAYOUT button), which
 // writes back through `reorder`/`toggle*` and persists to
-// ~/.local/state/klipshell/dashboard.json.
+// ~/.local/state/layer/dashboard.json.
 Item {
     id: root
 
@@ -372,7 +372,7 @@ Item {
 
     // ── Persistence ───────────────────────────────────────────────────
     function _statePath() {
-        return (Quickshell.env("HOME") || "~") + "/.local/state/klipshell/dashboard.json"
+        return (Quickshell.env("HOME") || "~") + "/.local/state/layer/dashboard.json"
     }
     property var _saveProc: Process {
         command: ["true"]

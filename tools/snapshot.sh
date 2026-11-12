@@ -1,7 +1,7 @@
 #!/bin/bash
-# klipshell snapshot — git-free rollback net.
+# layer snapshot — git-free rollback net.
 # Writes a timestamped tar of the whole checkout to a durable state dir and
-# prunes to the newest 20. klipshell is not under version control, so this is
+# prunes to the newest 20. layer is not under version control, so this is
 # the only revert source. Run before any risky multi-file pass.
 #
 # Usage: ./tools/snapshot.sh [label]
@@ -10,13 +10,13 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-SNAPSHOT_DIR="${KLIPSHELL_SNAPSHOT_DIR:-$HOME/.local/state/klipshell/snapshots}"
+SNAPSHOT_DIR="${LAYER_SNAPSHOT_DIR:-$HOME/.local/state/layer/snapshots}"
 LABEL="${1:-manual}"
 KEEP=20
 
 mkdir -p "$SNAPSHOT_DIR"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-OUT="$SNAPSHOT_DIR/klipshell-$STAMP-$LABEL.tar.gz"
+OUT="$SNAPSHOT_DIR/layer-$STAMP-$LABEL.tar.gz"
 
 tar czf "$OUT" \
   --exclude='__pycache__' \

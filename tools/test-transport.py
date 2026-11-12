@@ -177,7 +177,7 @@ def main():
     server = ThreadingHTTPServer(("127.0.0.1", 0), Stub)
     threading.Thread(target=server.serve_forever, daemon=True).start()
 
-    root = Path(tempfile.mkdtemp(prefix="klipshell-transport-"))
+    root = Path(tempfile.mkdtemp(prefix="layer-transport-"))
     build_tree(root, server.server_address[1])
     try:
         proc = subprocess.run(

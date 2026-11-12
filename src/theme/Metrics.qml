@@ -36,7 +36,7 @@ QtObject {
     readonly property int gaugeKnob: 19
 
     // Shell window on a 1920x1080 seat, leaving the Hyprland gap visible. The
-    // window floats (windowrule "klipshell"), so this size is the real one —
+    // window floats (windowrule "layer"), so this size is the real one —
     // 1060 hung past the bottom of the seat and Hyprland gave back 1022.
     readonly property int windowWidth: 1900
     readonly property int windowHeight: 1020

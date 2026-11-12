@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/header.svg" alt="klipshell" width="700">
+  <img src="assets/header.svg" alt="layer" width="700">
 </div>
 
 <br>
@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/Qt_6-QML-41cd52?style=for-the-badge&logo=qt&logoColor=white" alt="Qt 6">
   <img src="https://img.shields.io/badge/views-8-5e5791?style=for-the-badge" alt="8 views">
   <img src="https://img.shields.io/badge/Klipper-Moonraker-463f77?style=for-the-badge" alt="Klipper">
-  <img src="https://img.shields.io/github/last-commit/CWebb89/Klipshell?style=for-the-badge&color=teal" alt="Last commit">
+  <img src="https://img.shields.io/github/last-commit/CWebb89/layer?style=for-the-badge&color=teal" alt="Last commit">
 </div>
 
 <br>
@@ -31,7 +31,7 @@
 
 ---
 
-klipshell is a desktop control surface for Klipper printers. It talks to
+layer is a desktop control surface for Klipper printers. It talks to
 [Moonraker](https://moonraker.readthedocs.io/) over HTTP and puts eight views in
 one keyboard-driven window: dashboard, GCode console, print files, history, bed
 mesh, GCode viewer, machine health, and LayerMind diagnostics.
@@ -50,8 +50,8 @@ up the same Material You palette as the rest of the desktop.
 ## ✦ Screenshots
 
 <div align="center">
-  <a href="https://cdn.jsdelivr.net/gh/CWebb89/Klipshell@main/docs/video/klipshell-demo.mp4">
-    <img src="docs/video/klipshell-demo-poster.jpg" alt="Demo video" width="820">
+  <a href="https://cdn.jsdelivr.net/gh/CWebb89/layer@main/docs/video/layer-demo.mp4">
+    <img src="docs/video/layer-demo-poster.jpg" alt="Demo video" width="820">
   </a>
   <br>
   <sub>Click to play, two minutes: console, history, bed mesh, GCode viewer, machine, LayerMind.</sub>
@@ -128,7 +128,7 @@ It is not finished, on both sides:
 - Diagnostic colour is guessed from the message text (`error`, `warn`, `ok`). The
   schema declares no severity.
 - The green dot means the snapshot file exists, not that it is fresh, and
-  klipshell cannot start or stop the daemon.
+  layer cannot start or stop the daemon.
 
 <br>
 
@@ -141,8 +141,8 @@ icon is a Nerd Font glyph. matugen is optional; without it the window falls back
 to a baked-in warm scheme.
 
 ```fish
-git clone git@github.com:CWebb89/Klipshell.git
-cd Klipshell
+git clone git@github.com:CWebb89/layer.git
+cd layer
 ./install.sh          # registers the matugen template, seeds the printer list
 ./launch.sh
 ```
@@ -189,10 +189,10 @@ in the checkout.
 | Path | Contents |
 |------|----------|
 | `src/config/printers.json` | Printer names, hosts, ports (gitignored) |
-| `~/.local/state/klipshell/settings.json` | Jog steps, feedrates, macro order, API keys, default printer, poll interval, units, confirmations |
-| `~/.local/state/klipshell/dashboard.json` | Card order, visibility, collapse |
-| `~/.local/state/klipshell/presets.json` | Material temperature presets |
-| `~/.local/state/klipshell/viewer.json` | GCode viewer toggles |
+| `~/.local/state/layer/settings.json` | Jog steps, feedrates, macro order, API keys, default printer, poll interval, units, confirmations |
+| `~/.local/state/layer/dashboard.json` | Card order, visibility, collapse |
+| `~/.local/state/layer/presets.json` | Material temperature presets |
+| `~/.local/state/layer/viewer.json` | GCode viewer toggles |
 | `~/.local/state/layermind/<printer>.json` | Written by the LayerMind daemon, read-only here |
 
 `MoonrakerService` polls on a timer (1 s default, 250 ms – 10 s) and normalises

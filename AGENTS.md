@@ -1,4 +1,4 @@
-# AGENTS.md — klipshell
+# AGENTS.md — layer
 
 Standalone Quickshell app: a Moonraker control surface for Voron printers
 — dashboard, GCode console, file list and viewer, history, machine control —
@@ -10,17 +10,17 @@ of klip-tui; structured to fold into webb-shell as a plugin later.
 - Current code is authoritative. The design brief: the shell grammar in
   `src/components` (section headers, separators, sliders, list rows, detail
   pills) + matugen Material-You colors via the same 36-key MD3
-  contract webb-shell consumes (`assets/matugen/klipshell-colors.json`,
-  rendered to `~/.cache/matugen/klipshell-colors.json`, watched by `Colors`).
+  contract webb-shell consumes (`assets/matugen/layer-colors.json`,
+  rendered to `~/.cache/matugen/layer-colors.json`, watched by `Colors`).
 - klip-tui (the retired Rust TUI) is no longer on this machine; its harvested
   feature inventory is brain `moonraker/mainsail-feature-inventory.md`. Mainsail
-  is the primary reference — klipshell is a Quickshell rebuild of that surface.
+  is the primary reference — layer is a Quickshell rebuild of that surface.
   The original Phase 1 scope (polled HTTP JSON-RPC service + Dashboard +
   Console) is long since passed.
 - Project history — the engineering log 2026-09-20 → 2026-09-23, chronological,
   newest last — is `docs/HISTORY.md`. Grep it; it records what was believed on
   the day. Current truth is the project memory
-  (`~/.pi/agent/projects-memory/klipshell/MEMORY.md`), not that log.
+  (`~/.pi/agent/projects-memory/layer/MEMORY.md`), not that log.
 
 ## Architecture
 
@@ -46,7 +46,7 @@ of klip-tui; structured to fold into webb-shell as a plugin later.
   `MoonrakerService`'s `src/config/printers.json`, which the printer editor
   also writes back in place. Everything else persists outside the checkout:
   settings, dashboard layout, presets and viewer state under
-  `~/.local/state/klipshell/<store>.json`, Layermind under
+  `~/.local/state/layer/<store>.json`, Layermind under
   `~/.local/state/layermind/<printer>.json`. Never a fixed checkout path.
 
 ## Shell grammar (as implemented)
@@ -72,11 +72,11 @@ of klip-tui; structured to fold into webb-shell as a plugin later.
 
 ## Version control & rollback
 
-Public repo: `git@github.com:CWebb89/Klipshell.git` (branch `main`). The local
+Public repo: `git@github.com:CWebb89/Layer.git` (branch `main`). The local
 checkout is the source of truth and git is the primary revert source.
 `tools/snapshot.sh` remains a second net for risky multi-file passes — it writes
 a timestamped tar of the whole checkout to
-`~/.local/state/klipshell/snapshots/` (newest 20 kept) and prints its sha256.
+`~/.local/state/layer/snapshots/` (newest 20 kept) and prints its sha256.
 
 ```bash
 ./tools/snapshot.sh pre-refactor
@@ -95,13 +95,13 @@ set before adding anything that describes the LAN.
 
 ## Instance discipline
 
-Never more than one klipshell instance at a time. Every launch is preceded by
+Never more than one layer instance at a time. Every launch is preceded by
 an instance check, and a second instance is a defect — not a convenience.
 
 ```fish
-quickshell list -p /home/cwebb/dev/klipshell
-quickshell kill -p /home/cwebb/dev/klipshell
-quickshell -n -p /home/cwebb/dev/klipshell
+quickshell list -p /home/cwebb/dev/layer
+quickshell kill -p /home/cwebb/dev/layer
+quickshell -n -p /home/cwebb/dev/layer
 ```
 
 - Always pass the absolute repo path to `list`/`kill`/`-p`. A relative `-p .`
@@ -111,4 +111,4 @@ quickshell -n -p /home/cwebb/dev/klipshell
 - `-n` is a backstop, not a licence to skip the check. Run `list` first, every
   time, including for `shot app` one-shot captures.
 - Never `pkill quickshell`: webb-shell runs under the same binary. Scope kills
-  with `-p <dir>` so only the klipshell config dies.
+  with `-p <dir>` so only the layer config dies.

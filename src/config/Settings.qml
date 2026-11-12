@@ -10,10 +10,10 @@ import "settings-logic.js" as Logic
 // toggle, and the shell knobs (poll cadence, console scrollback, notification
 // cap).
 //
-// Stored in ~/.local/state/klipshell/settings.json (the same per-store pattern
+// Stored in ~/.local/state/layer/settings.json (the same per-store pattern
 // dashboard.json and viewer.json use) and NOT in src/config/printers.json: that
 // file describes the printers and is the one you copy to another machine or
-// check in — an API key belongs in per-user state. (klipshell is not actually
+// check in — an API key belongs in per-user state. (layer is not actually
 // under git today; the rule is written so it stays true if it ever is.) Every write replaces the whole `data` object so bindings on nested
 // fields re-evaluate — mutating in place would leave them stale.
 // The sanitising rules live in settings-logic.js and are covered by
@@ -190,7 +190,7 @@ QtObject {
 
     // ── Persistence ────────────────────────────────────────────────
     function path() {
-        return (Quickshell.env("HOME") || "~") + "/.local/state/klipshell/settings.json"
+        return (Quickshell.env("HOME") || "~") + "/.local/state/layer/settings.json"
     }
 
     property var loadProc: Process {
@@ -203,7 +203,7 @@ QtObject {
                     try {
                         root.data = Logic.merge(JSON.parse(t))
                     } catch (e) {
-                        console.error("klipshell settings parse failed:", e)
+                        console.error("layer settings parse failed:", e)
                     }
                 }
                 root.loaded = true
@@ -220,9 +220,9 @@ QtObject {
     function _save() {
         var f = root.path()
         var dir = f.slice(0, f.lastIndexOf("/"))
-        root.saveProc.environment = { KLIPSHELL_SETTINGS: JSON.stringify(root.data) }
+        root.saveProc.environment = { LAYER_SETTINGS: JSON.stringify(root.data) }
         root.saveProc.command = ["bash", "-c",
-            "mkdir -p '" + dir + "' && printf '%s' \"$KLIPSHELL_SETTINGS\" > '" + f + "'"]
+            "mkdir -p '" + dir + "' && printf '%s' \"$LAYER_SETTINGS\" > '" + f + "'"]
         root.saveProc.running = false
         root.saveProc.running = true
     }
